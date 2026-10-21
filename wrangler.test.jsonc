@@ -1,0 +1,16 @@
+{
+  // The workerd test pool's config (vitest.config.ts): the real config minus the
+  // remote-only AI and Vectorize bindings, so search runs keyword-only in tests —
+  // exercising the fallback path. test/setup.ts loads the corpus into the local D1.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "foi-navigator-test",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [{ "binding": "DB", "database_name": "foi-navigator", "database_id": "foi-navigator-test" }],
+  "ratelimits": [
+    { "name": "MCP_LIMIT", "namespace_id": "4101", "simple": { "limit": 10000, "period": 60 } },
+    { "name": "SEARCH_LIMIT", "namespace_id": "4102", "simple": { "limit": 10000, "period": 60 } }
+  ],
+  "rules": [{ "type": "Text", "globs": ["**/*.html"], "fallthrough": true }]
+}

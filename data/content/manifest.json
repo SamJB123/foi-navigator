@@ -1,0 +1,126 @@
+{
+  "builtAt": "2026-10-19",
+  "legislation": {
+    "act": {
+      "name": "Freedom of Information Act 1982",
+      "titleId": "C2004A02562",
+      "registerId": "C2026C00433",
+      "compilation": "122",
+      "inForceFrom": "2026-09-29",
+      "url": "https://www.legislation.gov.au/C2004A02562/latest/text"
+    },
+    "regs": {
+      "name": "Freedom of Information (Charges) Regulations 2019",
+      "titleId": "F2019L00348",
+      "registerId": "F2019L00348",
+      "compilation": "0",
+      "inForceFrom": "2019-03-22",
+      "url": "https://www.legislation.gov.au/F2019L00348/latest/text"
+    }
+  },
+  "guidelines": {
+    "1": {
+      "title": "Part 1: Introduction to the Freedom of Information Act 1982",
+      "version": "1.5",
+      "updated": "February 2026",
+      "url": "https://www.oaic.gov.au/freedom-of-information/freedom-of-information-guidance-for-government-agencies/foi-guidelines/part-1-introduction-to-the-freedom-of-information-act-1982",
+      "paragraphs": 52
+    },
+    "2": {
+      "title": "Part 2: Scope of application of the Freedom of Information Act 1982",
+      "version": "1.9",
+      "updated": "24 February 2026",
+      "url": "https://www.oaic.gov.au/freedom-of-information/freedom-of-information-guidance-for-government-agencies/foi-guidelines/part-2-scope-of-application-of-the-freedom-of-information-act-1982",
+      "paragraphs": 91
+    },
+    "3": {
+      "title": "Part 3: Processing and deciding FOI requests",
+      "version": "1.10",
+      "updated": "27 February 2026",
+      "url": "https://www.oaic.gov.au/freedom-of-information/freedom-of-information-guidance-for-government-agencies/foi-guidelines/part-3-processing-and-deciding-on-requests-foi-access",
+      "paragraphs": 332
+    },
+    "4": {
+      "title": "Part 4: Charges for providing access",
+      "version": "1.9",
+      "updated": "February 2026",
+      "url": "https://www.oaic.gov.au/freedom-of-information/freedom-of-information-guidance-for-government-agencies/foi-guidelines/part-4-charges-for-providing-access",
+      "paragraphs": 120
+    },
+    "5": {
+      "title": "Part 5: Exemptions",
+      "version": "1.6",
+      "updated": "May 2024",
+      "url": "https://www.oaic.gov.au/freedom-of-information/freedom-of-information-guidance-for-government-agencies/foi-guidelines/part-5-exemptions",
+      "paragraphs": 241
+    },
+    "6": {
+      "title": "Part 6: Conditional exemptions",
+      "version": "1.5",
+      "updated": "03 March 2026",
+      "url": "https://www.oaic.gov.au/freedom-of-information/freedom-of-information-guidance-for-government-agencies/foi-guidelines/part-6-conditional-exemptions",
+      "paragraphs": 258
+    },
+    "7": {
+      "title": "Part 7: Amendment and annotation of personal records",
+      "version": "1.5",
+      "updated": "05 March 2026",
+      "url": "https://www.oaic.gov.au/freedom-of-information/freedom-of-information-guidance-for-government-agencies/foi-guidelines/part-7-amendment-and-annotation-of-personal-records",
+      "paragraphs": 94
+    },
+    "9": {
+      "title": "Part 9: Internal agency review of decisions",
+      "version": "1.5",
+      "updated": "09 April 2024",
+      "url": "https://www.oaic.gov.au/freedom-of-information/freedom-of-information-guidance-for-government-agencies/foi-guidelines/part-9-internal-agency-review-of-decisions",
+      "paragraphs": 59
+    },
+    "10": {
+      "title": "Part 10: Review by the Information Commissioner",
+      "version": "1.12",
+      "updated": "05 March 2026",
+      "url": "https://www.oaic.gov.au/freedom-of-information/freedom-of-information-guidance-for-government-agencies/foi-guidelines/part-10-review-by-the-information-commissioner",
+      "paragraphs": 158
+    },
+    "11": {
+      "title": "Part 11: Investigations and complaints",
+      "version": "1.6",
+      "updated": "24 February 2026",
+      "url": "https://www.oaic.gov.au/freedom-of-information/freedom-of-information-guidance-for-government-agencies/foi-guidelines/part-11-investigations-and-complaints",
+      "paragraphs": 57
+    },
+    "12": {
+      "title": "Part 12: Vexatious applicant declarations",
+      "version": "1.6",
+      "updated": "24 February 2026",
+      "url": "https://www.oaic.gov.au/freedom-of-information/freedom-of-information-guidance-for-government-agencies/foi-guidelines/part-12-vexatious-applicant-declarations",
+      "paragraphs": 57
+    },
+    "13": {
+      "title": "Part 13: Information Publication Scheme",
+      "version": "1.6",
+      "updated": "28 July 2026",
+      "url": "https://www.oaic.gov.au/freedom-of-information/freedom-of-information-guidance-for-government-agencies/foi-guidelines/part-13-information-publication-scheme",
+      "paragraphs": 194
+    },
+    "14": {
+      "title": "Part 14: Disclosure log",
+      "version": "1.7",
+      "updated": "March 2022",
+      "url": "https://www.oaic.gov.au/freedom-of-information/freedom-of-information-guidance-for-government-agencies/foi-guidelines/part-14-disclosure-log",
+      "paragraphs": 95
+    },
+    "15": {
+      "title": "Part 15: Reporting",
+      "version": "1.6",
+      "updated": "10 March 2026",
+      "url": "https://www.oaic.gov.au/freedom-of-information/freedom-of-information-guidance-for-government-agencies/foi-guidelines/part-15-reporting",
+      "paragraphs": 10
+    }
+  },
+  "passages": 2066,
+  "licence": {
+    "legislation": "Based on content from the Federal Register of Legislation at 2026-10-19. For the latest information on Australian Government legislation please go to https://www.legislation.gov.au. Licensed CC BY 4.0.",
+    "guidelines": "Includes material from the Office of the Australian Information Commissioner website (www.oaic.gov.au), © Commonwealth of Australia, licensed CC BY 4.0. Reformatted into passages; not endorsed by the OAIC."
+  }
+}

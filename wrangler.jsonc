@@ -1,0 +1,35 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // FOI Navigator: a public, unauthenticated MCP server for Australian Government FOI
+  // practitioners. Stateless — no sessions, no case data stored (the case file is
+  // client-held). Only published law and guidance live here.
+  "name": "foi-navigator",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "observability": { "enabled": true },
+
+  // The corpus: FOI Act + Charges Regulations sections and FOI Guidelines paragraphs,
+  // loaded from data/d1/content.sql (scripts/build-content.ts) with an FTS5 index.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "foi-navigator",
+      "database_id": "e50fd8b6-95a8-4784-a212-ac71f2f0f8a3"
+    }
+  ],
+
+  // The semantic half of hybrid search: one bge-m3 vector per passage, keyed by passage id.
+  "vectorize": [{ "binding": "VECTORS", "index_name": "foi-navigator-passages" }],
+  "ai": { "binding": "AI" },
+
+  // Public endpoint: per-IP limits make abuse cheap rather than blocked.
+  "ratelimits": [
+    { "name": "MCP_LIMIT", "namespace_id": "4101", "simple": { "limit": 240, "period": 60 } },
+    { "name": "SEARCH_LIMIT", "namespace_id": "4102", "simple": { "limit": 60, "period": 60 } }
+  ],
+
+  // The MCP App (deadline timeline) is built to dist/ and imported as text.
+  "rules": [{ "type": "Text", "globs": ["**/*.html"], "fallthrough": true }]
+}
