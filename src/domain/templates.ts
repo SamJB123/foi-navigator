@@ -43,6 +43,8 @@ type Ctx = { cf?: CaseFile; tl?: Timeline; d: Record<string, string> };
 const slot = (ctx: Ctx, key: string, hint: string) => ctx.d[key] ?? `[[${hint}]]`;
 const date = (iso?: string | null) => (iso ? longDate(iso) : undefined);
 const dueOf = (ctx: Ctx) => date(ctx.tl?.processing.effective_due) ?? "[[decision due date — run foi_calculate_deadlines]]";
+/** The 30th day itself, not rolled past a weekend: s 15AA agreements must be made by then ([3.247] fn 171). */
+const lastDayOf = (ctx: Ctx) => date(ctx.tl?.processing.statutory_due) ?? "[[last day of the processing period — run foi_calculate_deadlines]]";
 const ref = (ctx: Ctx) => ctx.cf?.reference ?? slot(ctx, "reference", "FOI reference");
 const received = (ctx: Ctx) => date(ctx.cf?.received_date) ?? "[[date received]]";
 const scope = (ctx: Ctx) => ctx.cf?.summary ?? slot(ctx, "scope", "scope of the request, as you understand it");
@@ -51,7 +53,9 @@ export const REVIEW_RIGHTS = `## Your review rights
 
 If you disagree with this decision, you can ask for it to be reviewed. You do not have to seek internal review before asking the Information Commissioner.
 
-**Internal review.** Apply in writing within 30 days after the day you were notified of this decision (s 54B of the FOI Act). An officer other than the person who made this decision will make a fresh decision within 30 days (s 54C). Send your application to [[FOI contact email or address]].
+**Internal review.** Apply in writing within 30 days after the day you were notified of this decision, or any longer period we allow (s 54B of the FOI Act). An officer other than the person who made this decision will make a fresh decision within 30 days (s 54C). Send your application to [[FOI contact email or address]].
+
+_[Delete the internal review paragraph if this decision was made personally by the principal officer or the Minister: internal review is not available (s 54(1)).]_
 
 **Information Commissioner review.** Apply to the Australian Information Commissioner within 60 days after the day you were notified of this decision (s 54S(1)). You can apply online at www.oaic.gov.au.
 
@@ -77,7 +81,7 @@ We received your request on ${received(ctx)} for access to:
 
 The FOI Act requires us to notify you of a decision within 30 days. The current due date is **${dueOf(ctx)}**. This date may be extended — for example, if we need to consult third parties (s 15(6)) — and we will tell you if it changes.
 
-${ctx.cf?.own_personal_information ? "As your request is for your own personal information, no charges apply." : "We may impose charges for processing your request (s 29). If we do, we will send you a written estimate before doing the work, and you can ask for the charge to be reduced or waived."}
+${ctx.cf?.own_personal_information ? "As your request is for your own personal information, no charges apply." : "We may impose charges for processing your request (s 29). If we do, we will first send you a written preliminary assessment, and you can contend that the charge is wrongly assessed or should be reduced or not imposed."}
 
 ${slot(ctx, "scope_exclusions", "Optional: proposed exclusions to agree, e.g. duplicates, drafts, or names of junior staff. Delete if none.")}
 
@@ -121,7 +125,7 @@ ${slot(ctx, "sender", "name, position")}`,
 
 Your request is currently due for decision on **${dueOf(ctx)}**. We are asking whether you agree to extend that time by ${slot(ctx, "days", "number of days — 30 or fewer in total across all s 15AA extensions")} days, to ${slot(ctx, "new_due", "new due date")}, because ${slot(ctx, "reason", "the specific reason — e.g. the volume of documents, or consultation needed")}.
 
-If you agree, please reply in writing (an email is fine) before ${dueOf(ctx)}. Under s 15AA of the FOI Act we will notify the Information Commissioner of the extension. If you do not agree, we will continue to process your request within the current timeframe${slot(ctx, "alternative", "; optionally: and may apply to the Information Commissioner for an extension under s 15AB")}.
+If you agree, please reply in writing (an email is fine) on or before ${lastDayOf(ctx)}. Under s 15AA of the FOI Act we will notify the Information Commissioner of the extension. If you do not agree, we will continue to process your request within the current timeframe${slot(ctx, "alternative", "; optionally: and may apply to the Information Commissioner for an extension under s 15AB")}.
 
 Yours sincerely,
 ${slot(ctx, "sender", "name, position")}
@@ -170,11 +174,11 @@ Record for us: who searched, where, the search terms and date range, and what yo
 
 ### 2. Your views on release
 For any document you think should not be released in full, tell us — page and paragraph:
-- **What harm** would release cause, **to whom**, and **how likely** it is (a real and substantial possibility, not a mere risk).
+- **What harm** would release cause, **to whom**, and **how likely** it is (at least a real, significant or material possibility, not a mere risk or chance).
 - **The facts** that show it: e.g. an open investigation, a live negotiation, a person's safety, legal advice that hasn't been shared outside the agency.
 - Whether any of it is **already public**.
 
-Please **don't** rely on any of these — the FOI Act says they must be ignored (s 11B(4)): embarrassment to the Government or loss of confidence in it; that the document could be misunderstood; that its author is senior; or that it could cause confusion or debate.
+Please **don't** rely on any of these. The FOI Act says they must not be taken into account in deciding whether releasing conditionally exempt material would be contrary to the public interest (s 11B(4)): embarrassment to the Government or loss of confidence in it; that the document could be misinterpreted or misunderstood; that its author is senior; or that it could cause confusion or unnecessary debate.
 
 Your views are evidence for the authorised decision-maker, who decides what is released.
 
@@ -202,7 +206,7 @@ Contact: ${slot(ctx, "foi_contact", "FOI officer, email")}`,
 ## 3. Anything else the decision-maker should know
 ${slot(ctx, "context", "Context that helps the decision-maker — e.g. a decision has since been announced, a negotiation has concluded")}
 
-*Check before sending: none of the reasons above rely on embarrassment, possible misunderstanding, the author's seniority, or causing debate (s 11B(4)).*`,
+*Check before sending: none of the reasons above rely on embarrassment to the Government, possible misinterpretation or misunderstanding, the author's seniority, or confusion or unnecessary debate (s 11B(4)).*`,
   },
   {
     id: "document_schedule",
@@ -217,7 +221,7 @@ ${slot(ctx, "context", "Context that helps the decision-maker — e.g. a decisio
 |---|---|---|---|---|---|
 | 1 | ${slot(ctx, "row_date", "date")} | ${slot(ctx, "row_desc", "neutral description, e.g. 'Email from Branch to Minister's Office'")} | ${slot(ctx, "row_pages", "n")} | ${slot(ctx, "row_decision", "Release in full / Release in part / Refuse")} | ${slot(ctx, "row_provisions", "e.g. s 47F, s 22")} |
 
-*Descriptions must not reveal exempt matter (s 26(2)). Use roles, not private individuals' names.*`,
+*Describe documents without disclosing exempt matter ([3.288]; s 26(2)). Use roles, not private individuals' names.*`,
   },
   {
     id: "statement_of_reasons",
@@ -299,7 +303,7 @@ ${slot(ctx, "decision_date", "date")}`,
 
 ## Internal review decision
 
-On ${slot(ctx, "ir_received", "date")} you applied for internal review of the decision of ${slot(ctx, "original_date", "date")} on your FOI request. I am authorised to conduct internal reviews and I was not involved in the original decision (s 54C(2)). I have made a fresh decision.
+On ${slot(ctx, "ir_received", "date")} you applied for internal review of the decision of ${slot(ctx, "original_date", "date")} on your FOI request. I am authorised to conduct internal reviews and I did not make the original decision (s 54C(2)). I have made a fresh decision.
 
 ### Decision
 ${slot(ctx, "decision_summary", "Affirm / vary / set aside, and the outcome for each document")}
@@ -352,7 +356,7 @@ ${slot(ctx, "suggestions", "- limit the request to [date range]\n- limit it to [
 Your contact person is **${slot(ctx, "contact_officer", "name and position — available for the whole period")}**, ${slot(ctx, "contact_details", "phone and email")}.
 
 ### What you need to do
-The consultation period is **14 days after the day you receive this notice**. Before the end of that period, please tell us in writing that you:
+The consultation period is **14 days after the day you are given this notice**. Before the end of that period, please tell us in writing that you:
 1. withdraw your request; or
 2. revise your request; or
 3. do not wish to revise your request.
@@ -442,7 +446,7 @@ This is based on ${slot(ctx, "basis", "the number of documents identified, where
 ${slot(ctx, "deposit", "You are required to pay a deposit of $X before we continue processing your request (s 29(1)(e); Charges Regs s 12). / No deposit is required.")}
 
 ### Your options
-Within **30 days** after you receive this notice, you must tell us in writing that you:
+Within **30 days** after the day this notice is given to you, or any longer period we allow, you must tell us in writing that you:
 1. agree to pay the charge (paying the charge or deposit is enough); or
 2. contend that the charge has been wrongly assessed, or should be reduced or not imposed, giving your reasons; or
 3. withdraw your request.
@@ -451,7 +455,7 @@ If you do not respond within 30 days, your request will be taken to have been wi
 
 In deciding whether to reduce or not impose the charge, I must take into account whether payment would cause you (or anyone on whose behalf you applied) financial hardship, and whether giving access is in the general public interest or in the interest of a substantial section of the public (s 29(5)). I can also consider other relevant matters. If you claim financial hardship, please provide some evidence, such as a concession card or pension statement. If you rely on the public interest, please explain who would benefit from release and how.
 
-You may contest the charge even after paying it. The time to process your request stops from the day you receive this notice until you pay the charge or deposit, or we decide not to impose it (s 31). You must pay any charge before you are given access (Charges Regs s 11). A deposit is refunded only if the charge is not imposed, is reduced below the deposit, or we do not decide in time (Charges Regs s 12).
+You may contest the charge even after paying it. The time to process your request stops from the day you receive this notice until you pay the charge or deposit, or we decide not to impose it (s 31). You must pay the charge before you are given access (Charges Regs s 11). A deposit is refunded only if the charge is not imposed, is reduced below the deposit, or we do not decide in time (Charges Regs s 12).
 
 ${slot(ctx, "payment_options", "How to pay")}
 
@@ -459,7 +463,7 @@ Yours sincerely,
 ${slot(ctx, "sender", "name, position")}
 
 ---
-*Record \`charge_notice\` (date given) in the case file; the clock stops. Record \`charge_contention_received\` or \`charge_resolved\` when the applicant responds.*`,
+*Record \`charge_notice\` (the date the applicant receives it, s 31(1)) in the case file; the clock stops. Record \`charge_contention_received\` or \`charge_resolved\` when the applicant responds.*`,
   },
   {
     id: "charges_contention_decision",
@@ -569,9 +573,9 @@ Please respond by **${slot(ctx, "respond_by", "date — allow a reasonable time 
 
 Please note:
 - The decision is ours to make. We will consider your submission carefully, but it is not a veto.
-- If you make a submission objecting to release and we decide to release anyway, we will tell you, and you will be able to seek review before the documents are released. If you do not make a submission, those review rights do not apply.
+- If you make a submission objecting to release and we decide to release anyway, we will tell you, and you will be able to seek review before the documents are released. If you do not make a submission, those review rights do not apply (ss 27(8), 27A(7)). _[Delete this last sentence for a State consulted under s 26A: its review rights don't depend on a submission ([3.311]).]_
 - Documents released under the FOI Act are generally published on our disclosure log, unless publishing personal or business information would be unreasonable.
-- We cannot tell you who made the request.
+- We will not tell you who made the request without their consent.
 
 Contact: ${slot(ctx, "contact_details", "FOI officer, email, phone")}
 
@@ -608,7 +612,7 @@ ${slot(ctx, "reasons", "The exemption you contended for, the findings on each el
 
 ### Your review rights
 The documents will **not** be released until your opportunities to seek review have run out (s ${slot(ctx, "section", "26A(4) / 27(7) / 27A(6)")}).
-- **Internal review:** apply in writing within 30 days after the day you are notified of this decision (s 54B).
+- **Internal review:** apply in writing within 30 days after the day you are notified of this decision, or any longer period we allow (s 54B). _[Delete if this decision was made personally by the principal officer or the Minister (s 54A(1)).]_
 - **Information Commissioner review:** apply within 30 days after the day you are notified of this decision (s 54S(2)) at www.oaic.gov.au.
 
 Please let us know by **${slot(ctx, "intent_by", "date")}** if you intend to seek review. If we have not heard from you and no application has been made by the time your review rights run out, we will release the documents.

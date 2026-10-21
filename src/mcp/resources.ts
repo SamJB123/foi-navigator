@@ -23,9 +23,9 @@ export const GUIDE_MD = `# FOI Navigator
 Guided support for Australian Government FOI practitioners handling **incoming requests under the FOI Act 1982 (Cth)**, built on the Act (compilation ${MANIFEST.legislation.act.registerId}, in force ${MANIFEST.legislation.act.inForceFrom}), the FOI (Charges) Regulations 2019 and the OAIC FOI Guidelines.
 
 ## How it works
-- **The case file** is a small JSON record of dates and procedural events. Tools return it; you pass it back. The server stores nothing.
+- **The case file** is a small JSON record of dates and procedural events. Tools return it; you pass it back. The server keeps no case data.
 - **No personal information or document content is needed.** Use the agency reference, describe documents in general terms, and keep applicant names out.
-- **Every answer cites** a section of the Act or a Guidelines paragraph; use \`fetch\` to read the full text.
+- **Tool results cite** sections of the Act and Guidelines paragraphs; use \`fetch\` to read the full text.
 
 ## Tools
 | Tool | Use it to |
@@ -37,7 +37,7 @@ Guided support for Australian Government FOI practitioners handling **incoming r
 | foi_estimate_workload | Evidence a practical refusal from a sample (s 24AA) |
 | foi_estimate_charges | Calculate charges and deposits (Charges Regulations) |
 | foi_exemption_guide | Work through an exemption's elements |
-| foi_public_interest_test | Weigh factors; catch s 11B(4) irrelevant factors |
+| foi_public_interest_test | Set your factors beside s 11B(3), s 11B(4) and the weighing steps |
 | foi_draft_notice | Draft acknowledgements, s 24AB and s 29 notices, consultation letters, search minutes, statements of reasons, disclosure log entries |
 | search / fetch | Find and read the Act and Guidelines |
 

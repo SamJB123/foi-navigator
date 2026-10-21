@@ -116,7 +116,7 @@ export function registerPrompts(server: McpServer): void {
         `I work in a line area and the FOI team has asked me to search for documents and give my views on release${reference ? ` for ${reference}` : ""}.\n\n` +
           "1. Call foi_step_guidance for exemptions.line_area_views with role line_area and explain, in plain English, what the FOI team needs from me.\n" +
           "2. Help me record my search (where, terms, date range, results).\n" +
-          "3. For anything I think is sensitive, ask me what the harm would be, who it affects, how likely it is and the facts that show it. Check my reasons against s 11B(4) (embarrassment, misunderstanding, seniority, confusion) and tell me if any rely on them.\n" +
+          "3. For anything I think is sensitive, ask me what the harm would be, who it affects, how likely it is and the facts that show it. Remind me that the matters in s 11B(4) (embarrassment to the Government, misinterpretation or misunderstanding, the author's seniority, confusion or unnecessary debate) must not be taken into account in the public interest test, and ask me whether any of my reasons rest on them.\n" +
           "4. Call foi_draft_notice with template line_area_sensitivity_response, fill it in, and show me the full draft.\n\n" +
           "Describe the documents and harms in general terms; don't paste document content.",
       ),

@@ -106,6 +106,22 @@ describe("processing period", () => {
     expect(tl.warnings.join(" ")).toMatch(/s 7\(2\)/);
   });
 
+  it("requires a s 15AA agreement by the 30th day itself, even a weekend ([3.247] fn 171)", () => {
+    // Received Thu 5 Nov 2026 → day 30 is Sat 5 Dec; notification may roll to Mon 7 Dec, but agreement may not.
+    const late = computeTimeline(cf({ received_date: "2026-11-05", events: [{ type: "extension_s15AA", date: "2026-12-07", days: 14 }] }), "2026-12-07");
+    expect(late.adjustments[0].applied).toBe(false);
+    expect(late.processing.effective_due).toBe("2026-12-07");
+    const onTime = computeTimeline(cf({ received_date: "2026-11-05", events: [{ type: "extension_s15AA", date: "2026-12-05", days: 14 }] }), "2026-12-07");
+    expect(onTime.adjustments[0].applied).toBe(true);
+  });
+
+  it("dates a deemed refusal to the 30th day, not the rolled notification day (s 15AC(3))", () => {
+    const tl = computeTimeline(cf({ received_date: "2026-11-05" }), "2026-12-08");
+    expect(tl.status).toBe("deemed_refusal");
+    expect(date(tl, "deemed_refusal")).toBe("2026-12-05");
+    expect(tl.next_actions.join(" ")).toContain("Wed, 3 Feb 2027"); // 60 days from Sat 5 Dec
+  });
+
   it("records a deemed refusal on the last day of the period (s 15AC(3))", () => {
     const tl = computeTimeline(cf(), "2026-12-03");
     expect(tl.status).toBe("deemed_refusal");

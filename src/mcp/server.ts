@@ -19,7 +19,7 @@ Typical flow: foi_start_request (new request → case file and dates) → foi_st
 
 Most tools show the user a view of their result (drafts, tables, warnings, the case file). Where the user can see it, don't repeat it; where they can't, show drafts word for word and tables as given, not paraphrased.
 
-The case file is client-held JSON: each tool that returns one expects it back, with new events appended. The server stores nothing.
+The case file is client-held JSON: each tool that returns one expects it back, with new events appended. The server keeps no case data.
 
 Tools need procedural facts and general descriptions only — not applicant names or document content.
 

@@ -69,7 +69,7 @@ export function estimateWorkload(input: WorkloadInput): WorkloadResult {
     cautions.push(
       `The sample is ${pct}% of the documents. The Guidelines' previous guidance was 10–15%; a smaller sample can be acceptable for a very large set, but it must be representative — explain why it is ([3.209]).`,
     );
-  if (sample < 5) cautions.push("A sample this small is unlikely to be representative of complexity across the documents.");
+  if (sample < 5) cautions.push(`With ${sample} document${sample === 1 ? "" : "s"} sampled, record why the sample is representative of the documents in scope ([3.209]).`);
   cautions.push(
     "Use the actual documents and actual time taken on the sample — not a charges calculator's preset assumptions ([3.210]–[3.211]).",
     "There is no hours threshold: don't treat any figure (e.g. 40 hours) as a ceiling ([3.208]). The estimate is one consideration.",
@@ -116,7 +116,7 @@ export function estimateWorkload(input: WorkloadInput): WorkloadResult {
       "Key words for electronic searches ([3.231]).",
       "Excluding duplicates, drafts, email chains already captured, or media monitoring.",
       "Excluding names and contact details of junior staff, or third parties' personal information, to remove consultation.",
-      "Pointing to information already published, or offering administrative release of a summary ([3.231], [3.240]).",
+      "Pointing to information already published ([3.231]), or offering administrative release, e.g. of information extracted from a database ([3.240]).",
     ],
     evidence_statement: statement,
   };

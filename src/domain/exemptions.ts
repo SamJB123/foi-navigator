@@ -7,6 +7,7 @@
  * Guidelines ranges are the paragraphs under each exemption's heading in Parts 5 and
  * 6; test/content.test.ts checks that every cited passage exists.
  */
+import { FRANKNESS_GUIDANCE } from "./public-interest.ts";
 
 export type Exemption = {
   provision: string; // "47F"
@@ -35,9 +36,9 @@ export const EXEMPTIONS: Exemption[] = [
       "s 33(a): disclosure would, or could reasonably be expected to, cause damage to (i) the security of the Commonwealth, (ii) the defence of the Commonwealth, or (iii) the international relations of the Commonwealth; or",
       "s 33(b): disclosure would divulge information or matter communicated in confidence by or on behalf of a foreign government, an authority of a foreign government or an international organisation to the Government of the Commonwealth, an authority of the Commonwealth or a person receiving the communication on behalf of the Commonwealth.",
     ],
-    harm_test: "Damage must be reasonably expected, not merely possible; a security classification is not conclusive ([5.51]).",
+    harm_test: "Damage must be reasonably expected, not merely possible; a security classification is not conclusive ([5.23]–[5.24]).",
     ncnd: true,
-    consultation: "Foreign governments or entities may be consulted; s 15(7)–(8) extends the period by 30 days.",
+    consultation: "Foreign governments or entities may be consulted; for s 33(a)(iii) or (b), a written determination under s 15(7)–(8) extends the period by 30 days.",
     guidelines: { from: "gl:5.21", to: "gl:5.62", part: 5 },
     key_paragraphs: ["gl:5.24", "gl:5.38", "gl:5.45", "gl:5.51", "gl:5.55"],
     pitfalls: ["Relying on the classification marking alone.", "Assuming any mention of a foreign government is 'international relations' damage."],
@@ -59,15 +60,15 @@ export const EXEMPTIONS: Exemption[] = [
       "s 34(1)(c): it was brought into existence for the dominant purpose of briefing a minister on a document in (a); or",
       "s 34(1)(d): it is a draft of a document in (a), (b) or (c); or",
       "s 34(2): it is a copy of, or part of, or contains an extract from, such a document; or",
-      "s 34(3): disclosure would reveal a Cabinet deliberation or decision that has not been officially disclosed.",
+      "s 34(3): disclosure would reveal a Cabinet deliberation or decision whose existence has not been officially disclosed.",
     ],
     carve_outs: [
-      "Purely factual material is not exempt unless its disclosure would reveal a Cabinet deliberation or decision not officially disclosed (s 34(6)).",
+      "Purely factual material is not exempt unless its disclosure would reveal a Cabinet deliberation or decision whose existence has not been officially disclosed (s 34(6)).",
       "A document is not exempt only because it is attached to a Cabinet document (s 34(4)); a document officially publishing a Cabinet decision is not exempt (s 34(5)).",
     ],
     guidelines: { from: "gl:5.63", to: "gl:5.94", part: 5 },
     key_paragraphs: ["gl:5.72", "gl:5.83", "gl:5.88", "gl:5.92"],
-    pitfalls: ["Treating a document as Cabinet-exempt because it was later used in a submission ([5.72]–[5.77]).", "Withholding purely factual material."],
+    pitfalls: ["Treating a document as exempt under s 34(1)(a) because it was later used in a submission ([5.72]–[5.77]).", "Withholding purely factual material."],
     line_area_questions: [
       "Was this document created for the dominant purpose of going to Cabinet, or for another purpose and later used?",
       "Has the Cabinet decision or deliberation been officially announced?",
@@ -85,10 +86,10 @@ export const EXEMPTIONS: Exemption[] = [
       "s 37(1)(b): disclose, or enable a person to ascertain, the existence or identity of a confidential source of information in relation to the enforcement or administration of the law; or",
       "s 37(1)(c): endanger the life or physical safety of any person; or",
       "s 37(2)(a): prejudice the fair trial of a person or the impartial adjudication of a particular case; or",
-      "s 37(2)(b): disclose lawful methods or procedures for preventing, detecting, investigating or dealing with breaches of the law, where disclosure would be reasonably likely to prejudice their effectiveness; or",
+      "s 37(2)(b): disclose lawful methods or procedures for preventing, detecting, investigating or dealing with breaches of the law, where disclosure would, or would be reasonably likely to, prejudice their effectiveness; or",
       "s 37(2)(c): prejudice the maintenance or enforcement of lawful methods for the protection of public safety.",
     ],
-    harm_test: "'Would or could reasonably be expected to' — a real and substantial possibility, supported by evidence ([5.101]).",
+    harm_test: "'Would or could reasonably be expected to': more than a mere risk or possibility, on evidence ([5.101]); for s 37(1)(c) the risk need not be substantial ([5.121]).",
     ncnd: true,
     guidelines: { from: "gl:5.95", to: "gl:5.133", part: 5 },
     key_paragraphs: ["gl:5.101", "gl:5.102", "gl:5.104", "gl:5.107", "gl:5.121", "gl:5.124"],
@@ -132,7 +133,7 @@ export const EXEMPTIONS: Exemption[] = [
       "the communication was confidential;",
       "privilege has not been waived — expressly, or by conduct inconsistent with maintaining confidentiality (s 42(2)).",
     ],
-    carve_outs: ["Not exempt to the extent the document contains operational information of the agency (s 42(3))."],
+    carve_outs: ["Not exempt by reason only that the document contains operational information of the agency (s 42(3))."],
     guidelines: { from: "gl:5.144", to: "gl:5.182", part: 5 },
     key_paragraphs: ["gl:5.147", "gl:5.153", "gl:5.160", "gl:5.168", "gl:5.177", "gl:5.181"],
     pitfalls: ["Not addressing waiver — e.g. advice summarised in a public statement or shared outside the agency.", "Claiming privilege over policy discussion that merely mentions legal advice.", "Ignoring the OAIC's view on the 'real harm' consideration ([5.177]–[5.179])."],
@@ -158,7 +159,7 @@ export const EXEMPTIONS: Exemption[] = [
     carve_outs: ["Does not apply to deliberative documents prepared by ministers, their staff or agency officers in the course of their duties, unless disclosure would breach a confidence owed to someone outside government (s 45(2))."],
     guidelines: { from: "gl:5.183", to: "gl:5.202", part: 5 },
     key_paragraphs: ["gl:5.186", "gl:5.192", "gl:5.194", "gl:5.198", "gl:5.201"],
-    pitfalls: ["Relying on a confidentiality marking or contract clause alone.", "Using s 45 for information the agency itself generated."],
+    pitfalls: ["Relying on a confidentiality marking or contract clause alone.", "Using s 45 where no person outside government could bring an action for breach of confidence (s 45(1)–(2))."],
     line_area_questions: [
       "Who supplied the information, and on what understanding of confidentiality? Is that understanding documented?",
       "Is the information still confidential, or now public or widely known?",
@@ -203,7 +204,7 @@ export const EXEMPTIONS: Exemption[] = [
       "s 47(1)(a): the information is a trade secret; or",
       "s 47(1)(b): the information has a commercial value, and that value would be, or could reasonably be expected to be, destroyed or diminished if disclosed.",
     ],
-    consultation: "Consult the business under s 27 (+30 days, s 15(6)).",
+    consultation: "Consult the business under s 27 where it might reasonably wish to contend s 47 or s 47G applies and consultation is reasonably practicable (+30 days, s 15(6)).",
     guidelines: { from: "gl:5.226", to: "gl:5.238", part: 5 },
     key_paragraphs: ["gl:5.229", "gl:5.234", "gl:5.238"],
     pitfalls: ["Treating all commercial information as commercially valuable without showing how disclosure diminishes value."],
@@ -233,7 +234,7 @@ export const EXEMPTIONS: Exemption[] = [
       "s 47B(b): would divulge information or matter communicated in confidence by or on behalf of the Government of a State or an authority of a State to the Commonwealth or a Commonwealth authority; or",
       "s 47B(d), (f): the equivalents for information communicated in confidence by or to a Norfolk Island authority.",
     ],
-    consultation: "Consult the State under s 26A where arrangements exist (+30 days, s 15(6)); the State's views are considered, not decisive ([6.40]–[6.45]).",
+    consultation: "Consult the State under s 26A where it may reasonably wish to contend s 47B applies (+30 days, s 15(6)); its views must be considered but are not decisive ([6.40]–[6.45]).",
     guidelines: { from: "gl:6.22", to: "gl:6.45", part: 6 },
     key_paragraphs: ["gl:6.25", "gl:6.32", "gl:6.34", "gl:6.40", "gl:6.240"],
     pitfalls: ["Assuming that any State involvement means damage to relations.", "Treating the State's objection as decisive."],
@@ -258,23 +259,26 @@ export const EXEMPTIONS: Exemption[] = [
       "Purely factual material — s 47C(2)(b) ([6.67]–[6.72]).",
       "Reports of scientific or technical experts, reports of prescribed bodies, and records of or formal statements of reasons for final decisions — s 47C(3) ([6.73]–[6.75]).",
     ],
-    harm_test: "No harm element: harm is considered in the public interest test, where generic 'frankness and candour' claims carry little weight without evidence ([6.245]–[6.252]).",
+    harm_test: `No harm element: harm is considered in the public interest test. ${FRANKNESS_GUIDANCE}`,
     guidelines: { from: "gl:6.46", to: "gl:6.78", part: 6 },
     key_paragraphs: ["gl:6.54", "gl:6.59", "gl:6.67", "gl:6.73", "gl:6.245"],
-    pitfalls: ["Applying s 47C to whole documents including factual or background material.", "Relying on generic 'frankness and candour' in the public interest test."],
+    pitfalls: [
+      "Applying s 47C to whole documents without separating purely factual material that can be released (s 22, [6.70]–[6.72]).",
+      "Treating a document as deliberative because of its format (a brief, a submission, a draft) rather than its content ([6.61]).",
+    ],
     line_area_questions: [
       "Which parts are opinion, advice or recommendation, and which are facts or background?",
       "Is the deliberation still live? Has a final decision been made and announced?",
       "If you say release would harm future advice, what specific evidence supports that for this document?",
     ],
-    information_types: ["advice", "brief", "recommendation", "options paper", "draft", "policy development", "deliberation", "ministerial submission"],
+    information_types: ["advice", "recommendation", "opinion", "options", "policy development", "deliberation", "consultation"],
   },
   {
     provision: "47D",
     name: "Financial or property interests of the Commonwealth",
     kind: "conditional",
-    summary: "Disclosure would, or could reasonably be expected to, have a substantial adverse effect on the financial or property interests of the Commonwealth or an agency.",
-    elements: ["the Commonwealth or an agency has a financial or property interest;", "disclosure would, or could reasonably be expected to, have a substantial adverse effect on that interest."],
+    summary: "Disclosure would have a substantial adverse effect on the financial or property interests of the Commonwealth or an agency.",
+    elements: ["the Commonwealth or an agency has a financial or property interest;", "disclosure would have a substantial adverse effect on that interest."],
     harm_test: "'Substantial adverse effect' — a serious or significant effect, not trivial ([6.81]–[6.83]).",
     guidelines: { from: "gl:6.79", to: "gl:6.83", part: 6 },
     key_paragraphs: ["gl:6.80", "gl:6.81"],
@@ -305,7 +309,7 @@ export const EXEMPTIONS: Exemption[] = [
       "Would it undermine a test, audit or examination method that is not already public?",
       "For staff matters: how would release affect managing or assessing staff?",
     ],
-    information_types: ["operations", "audit", "staff", "personnel", "systems", "internal procedures", "security procedures", "email addresses"],
+    information_types: ["operations", "audit", "personnel management", "systems", "internal procedures", "security procedures"],
   },
   {
     provision: "47F",
@@ -318,13 +322,13 @@ export const EXEMPTIONS: Exemption[] = [
     ],
     carve_outs: [
       "Not conditionally exempt merely because it is the applicant's own personal information (s 47F(3)).",
-      "Where access to the applicant's own information may be detrimental to their health or wellbeing, access may be given through a qualified person (s 47F(4)–(5), [6.171]–[6.176]).",
+      "Where information about the applicant was provided by a qualified person and access might be detrimental to their health or wellbeing, access may be given through a qualified person (s 47F(4)–(5), [6.171]–[6.176]).",
     ],
     consultation: "Consult the person under s 27A where they might reasonably wish to contend the information is conditionally exempt (+30 days, s 15(6), [6.156]–[6.170]).",
     guidelines: { from: "gl:6.119", to: "gl:6.176", part: 6 },
     key_paragraphs: ["gl:6.122", "gl:6.133", "gl:6.146", "gl:6.153", "gl:6.156"],
     pitfalls: [
-      "Redacting all public servants' names and work details by default — usually not unreasonable to disclose ([6.146]–[6.152]).",
+      "Redacting all public servants' names and work details by default, instead of applying the s 47F(2) factors to each in context ([6.149]–[6.152]).",
       "Forgetting the public interest test after finding information conditionally exempt.",
     ],
     line_area_questions: [
@@ -345,7 +349,7 @@ export const EXEMPTIONS: Exemption[] = [
       "s 47G(1)(b): could reasonably be expected to prejudice the future supply of information to the Commonwealth or an agency for the administration of a law or of matters administered by an agency.",
     ],
     carve_outs: ["Does not apply to trade secrets or commercially valuable information covered by s 47 (s 47G(2)); and does not cover the applicant's own business information (s 47G(3))."],
-    consultation: "Consult the business under s 27 (+30 days, s 15(6), [6.201]–[6.212]).",
+    consultation: "Consult the business under s 27 where it might reasonably wish to contend s 47G applies and consultation is reasonably practicable (+30 days, s 15(6), [6.201]–[6.212]).",
     guidelines: { from: "gl:6.177", to: "gl:6.212", part: 6 },
     key_paragraphs: ["gl:6.181", "gl:6.184", "gl:6.196", "gl:6.201"],
     pitfalls: ["Accepting a business's objection without testing whether the adverse effect is unreasonable.", "Claiming prejudice to future supply where suppliers are legally obliged to provide the information."],
@@ -359,8 +363,8 @@ export const EXEMPTIONS: Exemption[] = [
     provision: "47H",
     name: "Research",
     kind: "conditional",
-    summary: "Information about research by an officer of CSIRO or ANU, where premature disclosure would be reasonably likely to expose the agency or officer unreasonably to disadvantage.",
-    elements: ["the agency is CSIRO or ANU (Schedule 4);", "the information relates to research being, or to be, undertaken by an officer;", "disclosure before completion would be reasonably likely to unreasonably disadvantage the agency or officer."],
+    summary: "Information about research by an officer of CSIRO or ANU, where premature disclosure would be likely unreasonably to expose the agency or officer to disadvantage.",
+    elements: ["the agency is CSIRO or ANU (Schedule 4);", "the information relates to research being, or to be, undertaken by an officer;", "disclosure before completion would be likely unreasonably to expose the agency or officer to disadvantage."],
     guidelines: { from: "gl:6.213", to: "gl:6.214", part: 6 },
     key_paragraphs: ["gl:6.213"],
     pitfalls: ["Applying s 47H in an agency not listed in Schedule 4."],
@@ -392,12 +396,13 @@ export function normaliseProvision(input: string): string {
   return input.replace(/^(s(ection)?\.?\s*)/i, "").replace(/\(.*$/, "").trim().toUpperCase();
 }
 
-/** Exemptions whose information types mention words in `text`, best first. */
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** Exemptions whose listed information types appear as whole words in `text`, best first. */
 export function suggestExemptions(text: string): Exemption[] {
-  const words = text.toLowerCase();
   return EXEMPTIONS.map((e) => ({
     e,
-    score: e.information_types.filter((t) => words.includes(t.toLowerCase())).length,
+    score: e.information_types.filter((t) => new RegExp(`\\b${escapeRe(t)}\\b`, "i").test(text)).length,
   }))
     .filter((x) => x.score > 0)
     .sort((a, b) => b.score - a.score)

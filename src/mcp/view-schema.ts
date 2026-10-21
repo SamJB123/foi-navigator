@@ -35,7 +35,7 @@ const base = {
 };
 
 const chargeLine = z.object({ item: text, provision: text, quantity: text, rate: text, amount: z.number() });
-const factorCheck = z.object({ factor: text, side: z.enum(["for", "against"]), flags: z.array(z.object({ id: text, text })), frankness: z.boolean() });
+const factor = z.object({ factor: text, side: z.enum(["for", "against"]) });
 const idText = z.object({ id: text, text });
 
 export const exemptionSchema = z.object({
@@ -110,11 +110,12 @@ export const viewSchema = z.discriminatedUnion("kind", [
     kind: z.literal("public_interest"),
     provision: text,
     name: text,
-    checks: z.array(factorCheck),
+    factors: z.array(factor),
     statutory_for: z.array(idText),
     irrelevant: z.array(idText),
     guidelines_for: strings,
     guidelines_against: strings,
+    frankness: text.optional(),
     weighing_steps: strings,
   }),
   z.object({

@@ -123,7 +123,7 @@ export function computeTimeline(cf: CaseFile, asOf: string = todayInCanberra()):
 
   keyDates.push({
     id: "received",
-    label: "Valid request received (day 0)",
+    label: "Request received (day 0)",
     date: received,
     provision: "s 15(2), [3.243]",
     kind: "event",
@@ -164,6 +164,9 @@ export function computeTimeline(cf: CaseFile, asOf: string = todayInCanberra()):
   let s24ABEnds: string | null = null;
   let decided: string | null = null;
   const expired = (date: string) => !pausedSince && date > rollWeekend(due);
+  // A s 15AA agreement or s 15AB application must be on or before the 30th day itself, even a
+  // weekend: AIA s 36 moves only the time to notify the decision ([3.247] fn 171, Kumar).
+  const pastLastDay = (date: string) => !pausedSince && date > due;
 
   for (const e of events) {
     switch (e.type) {
@@ -195,11 +198,12 @@ export function computeTimeline(cf: CaseFile, asOf: string = todayInCanberra()):
       case "extension_s15AA": {
         const asked = e.days ?? 0;
         const room = 30 - s15AA;
-        const late = expired(e.date);
+        const late = pastLastDay(e.date);
         const days = late ? 0 : Math.min(asked, room);
         let note: string | undefined;
         if (!asked) note = "No number of days given; record the agreed extension in days.";
-        else if (late) note = "Agreed after the processing period ended. A s 15AA agreement cannot be made once a request is a deemed refusal ([3.258]).";
+        else if (late)
+          note = `Recorded on ${longDate(e.date)}, after the last day of the processing period (${longDate(due)}). A s 15AA agreement must be made on or before that day, even if it is a weekend or public holiday ([3.247] fn 171, [3.258]).`;
         else if (asked > room) note = `Only ${room} more days are available: s 15AA extensions are capped at 30 days in total ([3.257]).`;
         adjustments.push({ label: EVENT_LABELS[e.type], provision: "s 15AA", days, kind: "extension", applied: days > 0, note });
         if (days > 0) {
@@ -219,7 +223,7 @@ export function computeTimeline(cf: CaseFile, asOf: string = todayInCanberra()):
           kind: "extension",
           applied: days > 0,
           note: days
-            ? "Valid if the application to the IC was made before the processing period expired ([3.262]), even if granted later."
+            ? "Applies if the application to the IC was made on or before the last day of the processing period, even if granted later ([3.247] fn 171, [3.262])."
             : "Record the number of days the IC allowed.",
         });
         if (days > 0) {
@@ -230,7 +234,7 @@ export function computeTimeline(cf: CaseFile, asOf: string = todayInCanberra()):
       }
       case "s24AB_notice": {
         if (s24ABUsed) {
-          warnings.push("Only one request consultation process is required for a request (s 24AB(9)); a second notice does not stop the clock again.");
+          warnings.push("A request consultation process is already recorded. The Act requires only one per request (s 24AB(9), [3.228]); this calculator does not stop the clock for a second notice.");
           break;
         }
         if (expired(e.date)) {
@@ -295,15 +299,21 @@ export function computeTimeline(cf: CaseFile, asOf: string = todayInCanberra()):
       }
       case "charge_notice": {
         if (cf.own_personal_information) {
-          warnings.push("No charge may be imposed for access to the applicant's own personal information (Charges Regs s 7(1)). The charge notice does not stop the clock.");
+          warnings.push(
+            "The case file records a request for the applicant's own personal information. No charge is payable for a document containing it (Charges Regs s 7(1)), so this calculator does not treat the charge notice as stopping the clock.",
+          );
           break;
         }
         if (expired(e.date)) {
-          warnings.push(`The charge notice on ${longDate(e.date)} came after the processing period ended: no charge can be imposed (Charges Regs s 7(2)), and the clock does not stop (s 31(1)(b)).`);
+          warnings.push(
+            `On the recorded events, the charge notice on ${longDate(e.date)} came after the processing period ended. If so, no charge can be imposed (Charges Regs s 7(2)–(3)) and s 31 does not stop the clock (s 31(1)(b)).`,
+          );
           break;
         }
         if (pausedSince) {
-          warnings.push("A charge notice is recorded while the clock is already stopped; the overlap is not double-counted.");
+          warnings.push(
+            "A charge notice is recorded while the clock is already stopped for request consultation; this calculator ignores it. If the charge is still unpaid after the s24AB_outcome, record charge_notice again on that date.",
+          );
           break;
         }
         pausedSince = e.date;
@@ -311,7 +321,7 @@ export function computeTimeline(cf: CaseFile, asOf: string = todayInCanberra()):
         const respondBy = addDays(e.date, 30);
         keyDates.push({
           id: "charge_response_due",
-          label: "Applicant must respond to the charge notice (or the request is taken to be withdrawn, s 29(2))",
+          label: "Applicant to respond to the charge notice within 30 days, unless the agency allows longer (s 29(1)(f)); otherwise the request is taken to be withdrawn (s 29(2))",
           date: respondBy,
           provision: "s 29(1)(f)",
           kind: "window",
@@ -371,12 +381,12 @@ export function computeTimeline(cf: CaseFile, asOf: string = todayInCanberra()):
   // An open request consultation lapses into withdrawal if the applicant does nothing (s 24AB(7)).
   if (pauseKind === "s24AB" && s24ABEnds && asOf > s24ABEnds) {
     warnings.push(
-      `The request consultation period ended on ${longDate(s24ABEnds)}. If the applicant did not consult the contact person or respond in writing, the request is taken to be withdrawn (s 24AB(7)) — record an s24AB_outcome of "withdrawn". But if the applicant tried to consult and the agency did not respond, it is not withdrawn ([3.233]). If the period was extended in writing, record s24AB_period_extended.`,
+      `The request consultation period ended on ${longDate(s24ABEnds)}. If the applicant did not consult the contact person during the period, or did not do one of the things in s 24AB(6) before it ended, the request is taken to be withdrawn (s 24AB(7)): record an s24AB_outcome of "withdrawn". But if the applicant tried to consult and the agency did not respond, it is not withdrawn ([3.233]). If the period was extended in writing, record s24AB_period_extended.`,
     );
   }
   if (pauseKind === "charge" && pausedSince && !events.some((x) => x.type === "charge_contention_received") && asOf > addDays(pausedSince, 30)) {
     warnings.push(
-      `More than 30 days have passed since the charge notice (${longDate(pausedSince)}). If the applicant has not paid, contended or withdrawn, the request is taken to be withdrawn (s 29(2)).`,
+      `More than 30 days have passed since the charge notice (${longDate(pausedSince)}). If the applicant has not paid, contended or withdrawn, and no longer period was allowed (s 29(1)(f)), the request is taken to be withdrawn (s 29(2)).`,
     );
   }
 
@@ -401,29 +411,37 @@ export function computeTimeline(cf: CaseFile, asOf: string = todayInCanberra()):
   else if (pausedSince) status = "paused";
   else if (effectiveDue && asOf > effectiveDue) status = "deemed_refusal";
 
-  if (status === "deemed_refusal" && effectiveDue) {
-    // s 15AC(3): refusal is taken to be decided, and notified, on the last day of the period.
+  if (status === "deemed_refusal" && statutoryDue) {
+    // s 15AC(3): refusal is taken to be decided, and notified, on the last day of the period: the
+    // 30th day itself, not the notification day it rolls to ([3.247] fn 171).
     keyDates.push({
       id: "deemed_refusal",
-      label: "Deemed refusal: decision taken to be made and notified on this day (s 15AC(3))",
-      date: effectiveDue,
+      label: "Deemed refusal: on the recorded events, the decision is taken to be made and notified on this day (s 15AC(3))",
+      date: statutoryDue,
       provision: "s 15AC(3), [3.265]",
       kind: "event",
       status: "info",
     });
     warnings.push(
-      "The processing period has expired: the request is a deemed refusal (s 15AC). The agency should still make a decision ([3.229], [3.265]–[3.271]); no charge can now be imposed (Charges Regs s 7(2)); s 15AA extensions are no longer available ([3.258]). The IC may allow further time under s 15AC(4)–(5); a decision within that time means the deemed refusal never applied (s 15AC(7)).",
+      `On the recorded events, the processing period ended on ${longDate(statutoryDue)} without a decision being notified: a deemed refusal (s 15AC). The agency should still make a decision ([3.229], [3.265]–[3.271]); no charge can be imposed (Charges Regs s 7(2)–(3)); a s 15AA extension can no longer be agreed ([3.258]). The IC may allow further time under s 15AC(4)–(5); a decision within that time means the deemed refusal never applied (s 15AC(7)).`,
     );
     next.push("Decide as soon as possible and consider applying in writing to the Information Commissioner for further time under s 15AC(4).");
-    next.push(`The applicant may seek IC review of the deemed refusal within 60 days (by ${longDate(addDays(effectiveDue, 60))}, s 54S(1)). Internal review is not available for a deemed decision.`);
+    next.push(`The applicant may seek IC review of the deemed refusal within 60 days (by ${longDate(addDays(statutoryDue, 60))}, s 54S(1)). Internal review is not available for a deemed decision.`);
   }
 
   if (decided) {
     const irBy = addDays(decided, 30);
     const icBy = addDays(decided, 60);
     keyDates.push(
-      { id: "internal_review_window", label: "Applicant may apply for internal review until", date: irBy, provision: "s 54B(1)", kind: "window", status: "info" },
-      { id: "ic_review_window", label: "Applicant may apply for IC review until", date: icBy, provision: "s 54S(1)", kind: "window", status: "info" },
+      {
+        id: "internal_review_window",
+        label: "Internal review: 30 days from notification ends, or later if the agency allows or access was given in part (s 54B(1)). Applies to an access refusal decision not made personally by the principal officer or Minister (s 54(1))",
+        date: irBy,
+        provision: "s 54B(1)",
+        kind: "window",
+        status: "info",
+      },
+      { id: "ic_review_window", label: "IC review of an access refusal decision: 60 days from notification ends (s 54S(1))", date: icBy, provision: "s 54S(1)", kind: "window", status: "info" },
     );
     const tpNotice = first("third_party_decision_notice");
     if (tpNotice) {
@@ -431,16 +449,17 @@ export function computeTimeline(cf: CaseFile, asOf: string = todayInCanberra()):
       keyDates.push({
         id: "third_party_release_from",
         label:
-          "Earliest release to the applicant if the objecting third party has not sought review (their 30 days for internal and IC review have run out, s 4(1) 'run out'). Check with them first — about 3 working days' notice ([3.316])",
+          "Earliest release to the applicant if the third party has not sought review: their 30 days for internal and IC review have run out (ss 54B(1), 54S(2)). Check with them first, about 3 working days before ([3.316])",
         date: releaseFrom,
-        provision: "ss 27(7), 27A(6), 26A(4); [3.315]",
+        provision: "ss 26A(4), 27(7), 27A(6); [3.315]",
         kind: "window",
-        status: asOf >= releaseFrom ? "met" : "info",
+        status: "info",
       });
     } else if (cf.third_parties?.length) {
       keyDates.push({
         id: "third_party_review_window",
-        label: "A third party who objected may seek internal or IC review until (do not release before this, ss 27(7), 27A(6))",
+        label:
+          "Third party's review period: 30 days after they are notified of the decision (ss 54B(1), 54S(2)). Record third_party_decision_notice for the exact dates; don't release until it has run out (ss 26A(4), 27(7), 27A(6))",
         date: addDays(decided, 30),
         provision: "ss 54A, 54S(2), [3.311]–[3.316]",
         kind: "window",
@@ -482,7 +501,7 @@ export function computeTimeline(cf: CaseFile, asOf: string = todayInCanberra()):
     const left = daysBetween(asOf, effectiveDue);
     if (left <= 10 && left >= 0) {
       next.push(
-        `${left === 0 ? "The decision is due today" : `${left} days remain`}. If more time is genuinely needed: s 15(6) if consulting a third party under ss 26A/27/27A; ask the applicant to agree under s 15AA (before ${longDate(effectiveDue)}); or apply to the IC under s 15AB before the period expires.`,
+        `${left === 0 ? "The decision is due today" : `${left} days remain`}. If more time is genuinely needed: s 15(6) if consulting a third party under ss 26A/27/27A; ask the applicant to agree in writing under s 15AA on or before ${longDate(due)}; or, if the request is complex or voluminous, apply to the IC under s 15AB on or before ${longDate(due)}. That day is the last day of the period even if it is a weekend: only notifying the decision moves to the next business day ([3.247] fn 171).`,
       );
     }
   }
@@ -502,7 +521,7 @@ export function computeTimeline(cf: CaseFile, asOf: string = todayInCanberra()):
     open: "In progress",
     paused: pauseKind === "s24AB" ? "Clock stopped: request consultation (s 24AB)" : "Clock stopped: charge unpaid (s 31)",
     decided: "Decision notified",
-    deemed_refusal: "Deemed refusal — processing period expired",
+    deemed_refusal: "Deemed refusal (on the recorded events)",
     withdrawn: "Withdrawn",
   };
 

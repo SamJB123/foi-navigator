@@ -12,7 +12,7 @@
  */
 import { App, applyDocumentTheme, applyHostStyleVariables } from "@modelcontextprotocol/ext-apps";
 import { longDate } from "../domain/deadlines.ts";
-import { checkFactors } from "../domain/public-interest.ts";
+import { factorList } from "../domain/public-interest.ts";
 import { isRecord } from "../guards.ts";
 import { type View, viewSchema } from "../mcp/view-schema.ts";
 import { base64, markdownToDocx } from "./docx.ts";
@@ -100,7 +100,7 @@ function renderDraft(v: Extract<View, { kind: "draft" }>): string {
 
 function renderCharges(v: Extract<View, { kind: "charges" }>): string {
   const inner = `
-    ${v.barred_by ? `<div class="banner stop" role="alert"><b>No charge can be imposed.</b> ${rich(v.barred_by, v.links)}</div>` : ""}
+    ${v.barred_by ? `<div class="banner stop" role="alert"><b>Bar on charging: Charges Regs s 7.</b> ${rich(v.barred_by, v.links)}</div>` : ""}
     <div class="figures">
       <div class="fig"><div class="fig-label">Total charge</div><div class="fig-value${v.barred_by ? " struck" : ""}">${aud(v.total)}</div></div>
       <div class="fig"><div class="fig-label">Maximum deposit</div><div class="fig-value">${aud(v.deposit_maximum)}</div><div class="small muted">${esc(v.deposit_rule)}</div></div>
@@ -143,55 +143,44 @@ function renderWorkload(v: Extract<View, { kind: "workload" }>): string {
 }
 
 function renderPublicInterest(v: Extract<View, { kind: "public_interest" }>): string {
-  const flagged = v.checks.filter((c) => c.flags.length);
-  const frank = v.checks.filter((c) => c.frankness);
-  const rows = v.checks
+  const rows = v.factors
     .map(
-      (c, n) => `<tr class="${c.flags.length ? "bad" : c.frankness ? "warn" : ""}">
-        <td><select data-factor-side="${n}" aria-label="Side"><option value="for"${c.side === "for" ? " selected" : ""}>For access</option><option value="against"${c.side === "against" ? " selected" : ""}>Against</option></select></td>
-        <td><input type="text" data-factor-text="${n}" value="${esc(c.factor)}" aria-label="Factor"></td>
-        <td class="state">${c.flags.length ? `⚠️ ${esc(c.flags.map((f) => f.id).join(", "))}` : c.frankness ? "Needs evidence" : "✓ OK"}</td>
+      (f, n) => `<tr>
+        <td><select data-factor-side="${n}" aria-label="Side"><option value="for"${f.side === "for" ? " selected" : ""}>For access</option><option value="against"${f.side === "against" ? " selected" : ""}>Against access</option></select></td>
+        <td><input type="text" data-factor-text="${n}" value="${esc(f.factor)}" aria-label="Factor"></td>
         <td><button type="button" class="link" data-remove-factor="${n}" aria-label="Remove factor">✕</button></td>
       </tr>`,
     )
     .join("");
   const inner = `
-    ${
-      flagged.length
-        ? `<div class="banner stop" role="alert"><b>${plural(flagged.length, "possible irrelevant factor")} — must not be taken into account (s 11B(4))</b>${flagged
-            .map(
-              (c) =>
-                `<div class="flag"><div class="flag-factor">“${esc(c.factor)}”</div>${c.flags.map((f) => `<div><b>${esc(f.id)}</b>: ${esc(f.text)}.</div>`).join("")}<div class="small">Remove it, or restate the real harm: who is affected, how, and how likely.</div></div>`,
-            )
-            .join("")}</div>`
-        : v.checks.length
-          ? `<div class="banner ok">None of your factors match the irrelevant factors in s 11B(4).</div>`
-          : ""
-    }
-    ${frank.length ? `<div class="banner warn"><b>Frankness and candour</b>: ${frank.map((c) => `“${esc(c.factor)}”`).join(", ")} needs specific evidence about this document and these circumstances; generic claims carry little weight (${linkify("[6.245]", v.links)}).</div>` : ""}
     <h2>Your factors</h2>
     <div class="table"><table class="factors">
-      <thead><tr><th>Side</th><th>Factor</th><th>Check</th><th></th></tr></thead>
-      <tbody>${rows || `<tr><td colspan="4" class="muted">No factors yet. Add the factors for and against access.</td></tr>`}</tbody>
+      <thead><tr><th>Side</th><th>Factor</th><th></th></tr></thead>
+      <tbody>${rows || `<tr><td colspan="3" class="muted">No factors yet. Add the factors for and against access.</td></tr>`}</tbody>
     </table></div>
-    <div class="row"><button type="button" data-action="add-factor">Add factor</button><button type="button" class="primary" data-action="recheck">Re-check factors</button></div>
+    <div class="row"><button type="button" data-action="add-factor">Add factor</button><button type="button" class="primary" data-action="save-factors">Update factors</button></div>
+    <div class="banner warn">
+      <b>Irrelevant factors: s 11B(4)</b>
+      <p>These must not be taken into account in deciding whether access would, on balance, be contrary to the public interest:</p>
+      ${list(v.irrelevant.map((i) => `**${i.id}** ${i.text}`), v.links)}
+    </div>
+    ${v.frankness ? `<p class="small">${rich(v.frankness, v.links)}</p>` : ""}
     <h2>Factors favouring access: s 11B(3)</h2>
-    <p class="small muted">Consider each one. Tick it once you have considered whether it applies.</p>
+    <p class="small muted">These must be considered if relevant (${linkify("[6.229]", v.links)}). Tick each once you have considered it.</p>
     ${checklist(
       v.statutory_for.map((f) => `**${f.id}** ${f.text}`),
       v.links,
       `s11B3-${v.provision}`,
     )}
-    ${section("Other factors favouring access (Guidelines [6.231])", list(v.guidelines_for, v.links))}
-    ${section("Factors against access (Guidelines [6.233], use only those the facts support)", list(v.guidelines_against, v.links))}
-    ${section("Irrelevant factors: s 11B(4)", list(v.irrelevant.map((i) => `**${i.id}** ${i.text}`), v.links))}
+    ${section("Other factors favouring access (Guidelines [6.231], non-exhaustive)", list(v.guidelines_for, v.links))}
+    ${section("Factors against access (Guidelines [6.233], non-exhaustive; the Act lists none)", `<p class="small">Where disclosure could reasonably be expected to:</p>${list(v.guidelines_against, v.links)}`)}
     ${section("Weighing the factors", `<ol>${v.weighing_steps.map((s) => `<li>${rich(s, v.links)}</li>`).join("")}</ol>`)}`;
   return shell(v, `Public interest test · s ${v.provision}`, inner, exportButtons("worksheet"));
 }
 
 function renderExemptionList(v: Extract<View, { kind: "exemption_list" }>): string {
   const inner = `
-    ${v.information && !v.matched ? `<div class="banner info">Nothing matched “${esc(v.information)}” by type, so this is the full list.</div>` : ""}
+    ${v.information && !v.matched ? `<div class="banner info">No exemption is listed against “${esc(v.information)}”, so this is the full list.</div>` : ""}
     <ul class="rows">${v.candidates
       .map(
         (c) => `<li class="erow">
@@ -407,19 +396,18 @@ function editedFactors(): { factors_for: string[]; factors_against: string[] } {
   return out;
 }
 
-function recheck(v: Extract<View, { kind: "public_interest" }>, edited: { factors_for: string[]; factors_against: string[] }) {
-  const checks = checkFactors(edited.factors_for, edited.factors_against);
-  history[history.length - 1] = { ...v, checks };
+/** Keep the officer's edited factors in the view, and tell the model what they now are. */
+function saveFactors(v: Extract<View, { kind: "public_interest" }>, edited: { factors_for: string[]; factors_against: string[] }) {
+  const factors = factorList(edited.factors_for, edited.factors_against);
+  history[history.length - 1] = { ...v, factors };
   render();
-  const flagged = checks.filter((c) => c.flags.length);
   const considered = v.statutory_for.filter((_, n) => ticked.has(`s11B3-${v.provision}-${n}`)).length;
   note(
-    `The officer edited and re-checked the public interest factors for s ${v.provision} in the FOI view. For: ${JSON.stringify(edited.factors_for)}. Against: ${JSON.stringify(edited.factors_against)}. ` +
-      (flagged.length ? `Still flagged under s 11B(4): ${flagged.map((c) => `"${c.factor}" (${c.flags.map((f) => f.id).join(", ")})`).join("; ")}.` : "None is flagged under s 11B(4).") +
-      ` s 11B(3) factors ticked as considered: ${considered} of ${v.statutory_for.length}.`,
-    { provision: v.provision, checks },
+    `The officer updated the public interest factors for s ${v.provision} in the FOI view. For access: ${JSON.stringify(edited.factors_for)}. Against access: ${JSON.stringify(edited.factors_against)}. ` +
+      `s 11B(3) factors ticked as considered: ${considered} of ${v.statutory_for.length}.`,
+    { provision: v.provision, factors },
   );
-  say(flagged.length ? `${plural(flagged.length, "factor")} still flagged` : "No irrelevant factors");
+  say("Factors updated");
 }
 
 root.addEventListener("click", (ev) => {
@@ -448,16 +436,16 @@ root.addEventListener("click", (ev) => {
       .catch(() => say("Ask in the chat to fill the gaps"));
   else if (d.action === "add-factor" && v.kind === "public_interest") {
     const edited = editedFactors();
-    history[history.length - 1] = { ...v, checks: [...checkFactors(edited.factors_for, edited.factors_against), { factor: "", side: "against", flags: [], frankness: false }] };
+    history[history.length - 1] = { ...v, factors: [...factorList(edited.factors_for, edited.factors_against), { factor: "", side: "against" }] };
     render();
     const inputs = [...root.querySelectorAll("[data-factor-text]")];
     const last = inputs.at(-1);
     if (last instanceof HTMLInputElement) last.focus();
-  } else if (d.action === "recheck" && v.kind === "public_interest") recheck(v, editedFactors());
+  } else if (d.action === "save-factors" && v.kind === "public_interest") saveFactors(v, editedFactors());
   else if (d.removeFactor !== undefined && v.kind === "public_interest") {
     const row = el.closest("tr");
     row?.remove();
-    recheck(v, editedFactors());
+    saveFactors(v, editedFactors());
   } else if (d.openExemption) void open("foi_exemption_guide", { provision: d.openExemption }, `Open s ${d.openExemption} in the exemption guide.`);
   else if (d.openPit) void open("foi_public_interest_test", { provision: d.openPit }, `Run the public interest test for s ${d.openPit}.`);
   else if (d.openStep) {

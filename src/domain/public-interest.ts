@@ -1,10 +1,10 @@
 /**
  * The public interest test for conditionally exempt documents (ss 11A(5), 11B), as a
- * worksheet: the statutory and Guidelines factors, a check of the user's own factors
- * against the four irrelevant factors in s 11B(4), and the weighing steps.
+ * worksheet: the statutory and Guidelines factors, the decision-maker's own factors
+ * set beside the irrelevant factors in s 11B(4), and the weighing steps.
  *
- * The check is a tripwire, not a judgment: it flags wording that commonly signals an
- * irrelevant factor so the decision-maker can look again.
+ * Whether a factor is irrelevant under s 11B(4) is a legal judgment for the
+ * decision-maker, so the worksheet presents the test and never classifies factors.
  */
 
 export const STATUTORY_FOR = [
@@ -39,42 +39,23 @@ export const GUIDELINES_AGAINST = [
   "prejudice an agency's management function, or the effectiveness of testing or auditing procedures",
 ];
 
+/** The factors that must not be taken into account, in the words of s 11B(4). */
 export const IRRELEVANT = [
-  {
-    id: "s11B(4)(a)",
-    text: "access could result in embarrassment to the Commonwealth Government, or cause a loss of confidence in it",
-    pattern: /embarrass|loss of (public )?confidence|reputation(al)?|adverse (media|publicity)|media (attention|interest|scrutiny|coverage)|negative (press|publicity|coverage)|public criticism|criticis(e|m)|bad look|political(ly)? (sensitive|damag)/i,
-  },
-  {
-    id: "s11B(4)(b)",
-    text: "access could result in any person misinterpreting or misunderstanding the document",
-    pattern: /misinterpret|misunderst|misconstru|out of context|misleading impression|misread|wrong impression|lack(s)? context/i,
-  },
-  {
-    id: "s11B(4)(c)",
-    text: "the author of the document was (or is) of high seniority in the agency",
-    pattern: /high seniority|seniority of|senior (officer|official|executive|author)|written by (the )?(secretary|deputy secretary|ses)|\bSES (author|officer)/i,
-  },
-  {
-    id: "s11B(4)(d)",
-    text: "access could result in confusion or unnecessary debate",
-    pattern: /confusion|confus(e|ing) the public|unnecessary (public )?debate|public debate|controvers|speculation|alarm/i,
-  },
-] as const;
+  { id: "s 11B(4)(a)", text: "access to the document could result in embarrassment to the Commonwealth Government, or cause a loss of confidence in the Commonwealth Government" },
+  { id: "s 11B(4)(b)", text: "access to the document could result in any person misinterpreting or misunderstanding the document" },
+  { id: "s 11B(4)(c)", text: "the author of the document was (or is) of high seniority in the agency to which the request for access to the document was made" },
+  { id: "s 11B(4)(d)", text: "access to the document could result in confusion or unnecessary debate" },
+];
 
-const FRANKNESS = /frank(ness)?|candou?r|chilling|deter (officers|staff|advisers)|future advice|inhibit/i;
+export const FRANKNESS_GUIDANCE =
+  "The Guidelines say frankness and candour claims should be approached cautiously and generally need special and specific circumstances ([6.246]–[6.252]).";
 
-export type FactorCheck = { factor: string; side: "for" | "against"; flags: { id: string; text: string }[]; frankness: boolean };
+export type Factor = { factor: string; side: "for" | "against" };
 
-export function checkFactors(factorsFor: string[], factorsAgainst: string[]): FactorCheck[] {
-  const check = (factor: string, side: "for" | "against"): FactorCheck => ({
-    factor,
-    side,
-    flags: side === "against" ? IRRELEVANT.filter((i) => i.pattern.test(factor)).map(({ id, text }) => ({ id, text })) : [],
-    frankness: side === "against" && FRANKNESS.test(factor),
-  });
-  return [...factorsFor.map((f) => check(f, "for")), ...factorsAgainst.map((f) => check(f, "against"))];
-}
+export const factorList = (factorsFor: string[], factorsAgainst: string[]): Factor[] => [
+  ...factorsFor.map((factor): Factor => ({ factor, side: "for" })),
+  ...factorsAgainst.map((factor): Factor => ({ factor, side: "against" })),
+];
 
 export const WEIGHING_STEPS = [
   "Confirm the document is conditionally exempt first — the statutory criteria of the conditional exemption must be established before the public interest test ([6.7]–[6.11]).",

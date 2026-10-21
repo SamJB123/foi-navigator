@@ -127,7 +127,8 @@ describe("discovery", () => {
 
   it("puts what must reach the user in the view itself", async () => {
     const pi = viewSchema.parse((await call("foi_public_interest_test", { provision: "47C", factors_against: ["release would embarrass the Minister"] })).result.structuredContent.view);
-    expect(pi.kind === "public_interest" && pi.checks[0].flags[0].id).toBe("s11B(4)(a)");
+    expect(pi.kind === "public_interest" && pi.factors).toEqual([{ factor: "release would embarrass the Minister", side: "against" }]);
+    expect(pi.kind === "public_interest" && pi.irrelevant.map((i) => i.id)).toEqual(["s 11B(4)(a)", "s 11B(4)(b)", "s 11B(4)(c)", "s 11B(4)(d)"]);
 
     const barred = viewSchema.parse((await call("foi_estimate_charges", { search_hours: 6, documents_contain_applicants_personal_information: true })).result.structuredContent.view);
     expect(barred.kind === "charges" && barred.barred_by).toMatch(/personal information/);
@@ -216,7 +217,7 @@ describe("intake", () => {
       },
       caps,
     );
-    expect(answered.result.structuredContent.validity).toBe("valid");
+    expect(answered.result.structuredContent.validity).toBe("meets_s15_2");
     const declined = await modern(
       "tools/call",
       { name: "foi_start_request", arguments: { reference: "FOI-1" }, inputResponses: { request_facts: { action: "decline" } } },
@@ -237,13 +238,15 @@ describe("intake", () => {
       as_of: "2026-11-06",
     });
     const sc = result.structuredContent;
-    expect(sc.validity).toBe("valid");
+    expect(sc.validity).toBe("meets_s15_2");
+    expect(result.content[0].text).toContain("On the facts given, the request meets the formal requirements of s 15(2)");
+    expect(sc.case_file.completed_steps).toEqual(["intake.receive"]);
     expect(sc.case_file.reference).toBe("FOI-2026-0412");
     expect(sc.timeline.processing.effective_due).toBe("2026-12-07");
     expect(result.content[0].text).toContain("s 27");
   });
 
-  it("flags an invalid request", async () => {
+  it("routes a request that doesn't identify the documents to request consultation, not invalidity ([3.49]–[3.50])", async () => {
     const { result } = await call("foi_start_request", {
       received_date: "2026-11-05",
       in_writing: true,
@@ -251,8 +254,21 @@ describe("intake", () => {
       identifies_documents: "no",
       has_contact_address: true,
     });
+    expect(result.structuredContent.validity).toBe("identification_issue");
+    expect(result.structuredContent.case_file.stage).toBe("scope.request_consultation");
+    expect(result.content[0].text).toContain("can't simply be treated as invalid");
+  });
+
+  it("flags a request that doesn't meet s 15(2) on the facts given", async () => {
+    const { result } = await call("foi_start_request", {
+      received_date: "2026-11-05",
+      in_writing: false,
+      states_foi_act: true,
+      identifies_documents: "yes",
+      has_contact_address: true,
+    });
     expect(result.structuredContent.validity).toBe("not_yet_valid");
-    expect(result.content[0].text).toContain("s 24AB");
+    expect(result.content[0].text).toContain("doesn't yet meet s 15(2)");
   });
 
   it("recalculates deadlines from events", async () => {
@@ -346,15 +362,21 @@ describe("guidance", () => {
     expect(result.structuredContent.candidates[0].provision).toBe("42");
   });
 
-  it("flags irrelevant public interest factors (s 11B(4))", async () => {
+  it("sets the decision-maker's factors beside s 11B(4) without classifying them", async () => {
     const { result } = await call("foi_public_interest_test", {
       provision: "47C",
       factors_for: ["inform debate on the program's cost"],
-      factors_against: ["release would embarrass the Minister", "the briefs could be misunderstood without context", "disclosure would inhibit frank advice"],
+      factors_against: ["release would embarrass the Minister"],
     });
     const sc = result.structuredContent;
-    expect(sc.irrelevant_flagged).toBe(2);
-    expect(sc.checks.find((c: { frankness: boolean }) => c.frankness)).toBeTruthy();
+    expect(sc.factors).toEqual([
+      { factor: "inform debate on the program's cost", side: "for" },
+      { factor: "release would embarrass the Minister", side: "against" },
+    ]);
+    const text = result.content[0].text;
+    expect(text).toContain("must not be taken into account");
+    expect(text).toContain("access to the document could result in confusion or unnecessary debate");
+    expect(text).not.toMatch(/match|flag|wording check/i);
   });
 
   it("drafts a statement of reasons with mandatory review rights", async () => {

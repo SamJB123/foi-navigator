@@ -84,9 +84,10 @@ export function estimateCharges(input: ChargesInput): ChargesResult {
   let barred: string | undefined;
   if (input.documents_contain_applicants_personal_information)
     barred =
-      "No charge: the documents contain the applicant's personal information (Charges Regs s 7(1), [4.42]–[4.45]). Where the personal information is a small part of large documents, consider consulting the applicant about narrowing scope before charging for the rest ([4.45]).";
+      "You indicated the documents contain the applicant's personal information. No charge is payable for such a document (Charges Regs s 7(1), [4.42]–[4.45]), even if it also contains other information ([4.45]).";
   else if (input.decision_late)
-    barred = "No charge: the decision is not notified within the processing period as extended (Charges Regs s 7(2)–(3), [4.46]–[4.48]); refund any deposit (Charges Regs s 12(3)(b)).";
+    barred =
+      "On the case file's dates, the decision was not notified within the processing period as extended. If so, no charge can be imposed (Charges Regs s 7(2)–(3), [4.47]–[4.48]) and any deposit must be refunded (Charges Regs s 12(3)(b)).";
 
   const deposit = barred ? 0 : total > 100 ? money(total * 0.25) : total > 25 ? 20 : 0;
   const depositRule =
@@ -96,12 +97,12 @@ export function estimateCharges(input: ChargesInput): ChargesResult {
     "Charge search time only on the basis that documents are where the filing system says (or ought to say) they are — time lost to poor record-keeping is not chargeable (reg 5(2), [4.28]–[4.29]).",
     "Decision-making time is the decision-maker's time (including preparing a schedule); not other officers discussing search results ([4.30]–[4.33]).",
     "Part hours are pro-rated ([4.26]). No GST is payable on FOI charges ([4.50]).",
-    "Charges are discretionary: consider the 'lowest reasonable cost' object (s 3(4)) and whether collecting the charge would cost more than it raises ([4.3]–[4.6], [4.114]).",
+    "Charges are discretionary: consider the 'lowest reasonable cost' object (s 3(4)), and whether the cost of calculating and collecting a charge might exceed the cost to the agency of processing the request ([4.3]–[4.6], [4.114]).",
     "An estimate must be fair and accurate, and not set so high it deters the applicant ([4.68]); base it on experience or a sample of the documents ([4.70]).",
-    "The applicant must pay before access is given (reg 11), and may contest the charge even after paying ([4.57], [4.63]).",
+    "Charges must be paid before access is given, except a supervised-inspection charge not fixed in advance (reg 11). The applicant may contest the charge even after paying ([4.57], [4.63]).",
   );
   if (total > 0 && total < 50 && !barred)
-    notes.push(`At ${aud(total)}, consider whether the cost of notifying and collecting the charge exceeds it — a common reason not to charge ([4.4]).`);
+    notes.push(`At ${aud(total)}, consider whether calculating and collecting the charge might cost more than processing the request; the Guidelines say it may then be more appropriate not to charge ([4.4]).`);
 
   return {
     chargeable: !barred && total > 0,
@@ -115,9 +116,9 @@ export function estimateCharges(input: ChargesInput): ChargesResult {
     waiver_considerations: [
       "Financial hardship to the applicant or the person on whose behalf they applied — must be considered (s 29(5)(a)); ordinarily needs some evidence, without intrusive inquiry ([4.101]–[4.104]).",
       "Whether giving access is in the general public interest or the interest of a substantial section of the public — must be considered (s 29(5)(b)); a different test from s 11A(5) ([4.105]–[4.113]).",
-      "Any other relevant matter: e.g. collection costs exceed the charge, documents needed for a hearing, research with no commercial benefit, the applicant narrowed the request ([4.114]–[4.115]).",
+      "Any other relevant matter: e.g. the cost of calculating and collecting the charge might exceed the cost of processing the request, documents needed for a hearing, research with no commercial benefit, the applicant narrowed the request ([4.114]–[4.115]).",
       "Matters that may support charging: commercial benefit to the applicant; documents of interest only to the applicant; material already published; very large volume ([4.99]).",
-      "Not relevant: that the applicant would not meet the full cost, or that the documents might be misinterpreted in public debate ([4.113]). Do not adopt a fixed rule that fetters the discretion ([4.96]).",
+      "Not a basis on its own: that the applicant would not otherwise meet the reasonable cost of processing. Not to be taken into account: that the applicant may use the documents in a way that leads to misinterpretation in public debate ([4.113]). Do not adopt a fixed rule that fetters the discretion ([4.96]).",
     ],
   };
 }

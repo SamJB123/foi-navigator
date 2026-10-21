@@ -74,7 +74,7 @@ for (const era of ["legacy", "modern"] as const) {
   const ex = await rpc("tools/call", { name: "foi_exemption_guide", arguments: { provision: "47E" } }, era);
   check(ex.structuredContent?.exemption?.provision === "47E", "foi_exemption_guide");
   const pi = await rpc("tools/call", { name: "foi_public_interest_test", arguments: { provision: "47F", factors_against: ["media interest would be embarrassing"] } }, era);
-  check(pi.structuredContent?.irrelevant_flagged === 1, "foi_public_interest_test flags s 11B(4)(a)");
+  check(pi.structuredContent?.irrelevant_factors?.length === 4 && pi.structuredContent?.factors?.length === 1, "foi_public_interest_test sets factors beside s 11B(4)");
   const draft = await rpc("tools/call", { name: "foi_draft_notice", arguments: { template: "acknowledgement", case_file: cf } }, era);
   check(draft.structuredContent?.text?.includes("21 Dec 2026"), "foi_draft_notice uses the case file's due date");
   const f = await rpc("tools/call", { name: "fetch", arguments: { id: "s 15AA" } }, era);
