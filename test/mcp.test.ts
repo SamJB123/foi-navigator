@@ -4,6 +4,8 @@
  */
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
+import { viewSchema } from "../src/mcp/view-schema.ts";
 import worker from "../src/index.ts";
 
 const ORIGIN = "https://foi.test";
@@ -11,7 +13,7 @@ let id = 1;
 
 async function parse(res: Response) {
   const text = await res.text();
-  const body = text.startsWith("event:") || text.startsWith("data:") ? text.split("\n").filter((l) => l.startsWith("data:")).pop()!.slice(5) : text;
+  const body = text.startsWith("event:") || text.startsWith("data:") ? (text.split("\n").filter((l) => l.startsWith("data:")).pop() ?? "data:{}").slice(5) : text;
   return JSON.parse(body);
 }
 
@@ -66,7 +68,9 @@ const call = (name: string, args: Record<string, unknown>) => legacy("tools/call
 describe("discovery", () => {
   it("lists the eleven read-only tools, with the App on the two timeline tools", async () => {
     const { result } = await legacy("tools/list");
-    const tools = result.tools as { name: string; annotations?: { readOnlyHint?: boolean }; _meta?: Record<string, unknown>; title?: string }[];
+    const tools = z
+      .array(z.object({ name: z.string(), title: z.string().optional(), annotations: z.object({ readOnlyHint: z.boolean().optional() }).optional(), _meta: z.record(z.string(), z.unknown()).optional() }))
+      .parse(result.tools);
     expect(tools.map((t) => t.name).sort()).toEqual(
       [
         "fetch",
@@ -88,29 +92,61 @@ describe("discovery", () => {
     }
     const withUi = (uri: string) => tools.filter((t) => JSON.stringify(t._meta ?? {}).includes(uri)).map((t) => t.name).sort();
     expect(withUi("ui://foi-navigator/timeline.html")).toEqual(["foi_calculate_deadlines", "foi_start_request"]);
-    expect(withUi("ui://foi-navigator/document.html")).toEqual(["foi_draft_notice", "foi_estimate_charges", "foi_estimate_workload", "foi_public_interest_test"]);
+    expect(withUi("ui://foi-navigator/view.html")).toEqual([
+      "foi_draft_notice",
+      "foi_estimate_charges",
+      "foi_estimate_workload",
+      "foi_exemption_guide",
+      "foi_process_map",
+      "foi_public_interest_test",
+      "foi_step_guidance",
+      "search",
+    ]);
   });
 
-  it("tells the assistant to show user-facing results, and gives the document view a card", async () => {
-    const { result } = await call("foi_draft_notice", { template: "acknowledgement", case_file: { received_date: "2026-11-05", reference: "FOI-1", events: [] } });
-    const [doc, note] = result.content;
-    expect(doc.text).toContain("## Draft: Acknowledgement of FOI request");
-    expect(note.annotations.audience).toEqual(["assistant"]);
-    expect(note.text).toMatch(/in full and word for word/);
-    const view = result.structuredContent.view;
-    expect(view.kind).toBe("draft");
-    expect(view.body).toBe(result.structuredContent.text);
-    expect(view.unfilled.length).toBeGreaterThan(0);
-    expect(view.filename).toBe("foi-1-acknowledgement");
-
-    const ch = (await call("foi_estimate_charges", { search_hours: 6, decision_hours: 12 })).result;
-    expect(ch.structuredContent.view.headline[0]).toEqual({ label: "Total", value: "$230.00" });
-    const pi = (await call("foi_public_interest_test", { provision: "47C", factors_against: ["release would embarrass the Minister"] })).result;
-    expect(pi.structuredContent.view.flags[0]).toContain("embarrass");
-    for (const name of ["foi_process_map", "foi_exemption_guide"]) {
-      const r = (await call(name, {})).result;
-      expect(r.content.at(-1).text, name).toMatch(/^Presenting this result:/);
+  it("gives every FOI view result a valid view with fixed caveats", async () => {
+    const cf = { received_date: "2026-11-05", reference: "FOI-1", stage: "exemptions.public_interest", completed_steps: ["intake.receive"], events: [] };
+    const calls: [string, Record<string, unknown>, string][] = [
+      ["foi_draft_notice", { template: "acknowledgement", case_file: cf }, "draft"],
+      ["foi_estimate_charges", { search_hours: 6, decision_hours: 12 }, "charges"],
+      ["foi_estimate_workload", { documents_in_scope: 1800, sample_documents: 150, search_hours: 20, sample_examine_minutes: 540 }, "workload"],
+      ["foi_public_interest_test", { provision: "47C", factors_against: ["release would embarrass the Minister"] }, "public_interest"],
+      ["foi_exemption_guide", { information: "legal advice" }, "exemption_list"],
+      ["foi_exemption_guide", { provision: "47C" }, "exemption"],
+      ["foi_process_map", { case_file: cf }, "process"],
+      ["foi_step_guidance", { step: "exemptions.public_interest", case_file: cf }, "process"],
+      ["search", { query: "s 47C deliberative" }, "search"],
+    ];
+    for (const [name, args, kind] of calls) {
+      const { result } = await call(name, args);
+      const view = viewSchema.parse(result.structuredContent.view);
+      expect(view.kind, name).toBe(kind);
+      expect(view.caveats.join(" "), name).toMatch(/s 23|authorised officer|authoritative text/);
     }
+  });
+
+  it("puts what must reach the user in the view itself", async () => {
+    const pi = viewSchema.parse((await call("foi_public_interest_test", { provision: "47C", factors_against: ["release would embarrass the Minister"] })).result.structuredContent.view);
+    expect(pi.kind === "public_interest" && pi.checks[0].flags[0].id).toBe("s11B(4)(a)");
+
+    const barred = viewSchema.parse((await call("foi_estimate_charges", { search_hours: 6, documents_contain_applicants_personal_information: true })).result.structuredContent.view);
+    expect(barred.kind === "charges" && barred.barred_by).toMatch(/personal information/);
+
+    const charges = viewSchema.parse((await call("foi_estimate_charges", { search_hours: 6, decision_hours: 12 })).result.structuredContent.view);
+    expect(charges.kind === "charges" && charges.lines.map((l) => l.amount)).toEqual([90, 240, -100]);
+
+    const cf = { received_date: "2026-11-05", reference: "FOI-1", events: [] };
+    const draft = viewSchema.parse((await call("foi_draft_notice", { template: "acknowledgement", case_file: cf })).result.structuredContent.view);
+    expect(draft.kind === "draft" && draft.calculated.map((c) => c.text)).toContain("Mon, 7 Dec 2026");
+    expect(draft.case?.decision_due).toBe("2026-12-07");
+    expect(draft.caveats.join(" ")).toMatch(/Public holidays are not checked/);
+  });
+
+  it("keeps the assistant note short, conditional and assistant-only", async () => {
+    const { result } = await call("foi_draft_notice", { template: "acknowledgement" });
+    const note = result.content.at(-1);
+    expect(note.annotations.audience).toEqual(["assistant"]);
+    expect(note.text).toMatch(/^If the user can see this result's view, don't repeat it/);
   });
 
   it("answers a 2026-07-28 tools/list with cache hints", async () => {
@@ -123,11 +159,13 @@ describe("discovery", () => {
     const prompts = (await legacy("prompts/list")).result.prompts.map((p: { name: string }) => p.name);
     expect(prompts).toEqual(expect.arrayContaining(["triage_new_request", "assess_exemption", "respond_as_line_area", "draft_statement_of_reasons"]));
     const resources = (await legacy("resources/list")).result.resources.map((r: { uri: string }) => r.uri);
-    expect(resources).toEqual(expect.arrayContaining(["foi://guide", "foi://process-map", "foi://sources", "ui://foi-navigator/timeline.html", "foi://act/47F", "foi://exemptions/47C"]));
+    expect(resources).toEqual(
+      expect.arrayContaining(["foi://guide", "foi://process-map", "foi://sources", "ui://foi-navigator/timeline.html", "ui://foi-navigator/view.html", "foi://act/47F", "foi://exemptions/47C"]),
+    );
   });
 
   it("serves the MCP Apps as self-contained HTML resources", async () => {
-    for (const uri of ["ui://foi-navigator/timeline.html", "ui://foi-navigator/document.html"]) {
+    for (const uri of ["ui://foi-navigator/timeline.html", "ui://foi-navigator/view.html"]) {
       const { result } = await legacy("resources/read", { uri });
       const c = result.contents[0];
       expect(c.mimeType, uri).toBe("text/html;profile=mcp-app");

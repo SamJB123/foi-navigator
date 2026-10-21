@@ -11,8 +11,12 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
+import { z } from "zod";
 
 const ROOT = join(import.meta.dirname, "..");
+
+/** The fields used from a Federal Register of Legislation version record (others pass through). */
+const VERSION = z.looseObject({ registerId: z.string(), compilationNumber: z.coerce.string(), start: z.string(), registeredAt: z.string() });
 const OUT = join(ROOT, "sources");
 const API = "https://api.prod.legislation.gov.au/v1";
 const UA = "foi-navigator-content-build (+https://github.com/aicolab)";
@@ -53,9 +57,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function fetchLegislation() {
   for (const { key, titleId, name } of LEGISLATION) {
-    const version = await (
-      await get(`${API}/versions/find(titleId='${titleId}',asAtSpecification='Latest')`)
-    ).json() as { registerId: string; compilationNumber: string; start: string; registeredAt: string };
+    const version = VERSION.parse(await (await get(`${API}/versions/find(titleId='${titleId}',asAtSpecification='Latest')`)).json());
     const epub = await get(
       `${API}/documents/find(registerId='${version.registerId}',type='Primary',format='Epub',uniqueTypeNumber=0,volumeNumber=0,rectificationVersionNumber=0)`,
     );

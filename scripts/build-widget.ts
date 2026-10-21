@@ -1,5 +1,5 @@
 /**
- * Bundle the MCP Apps (src/widget/timeline.ts, src/widget/document.ts) and inline each
+ * Bundle the MCP Apps (src/widget/timeline.ts, src/widget/view.ts) and inline each
  * into one self-contained HTML file in dist/, which the Worker imports as text and
  * serves as a ui:// resource. Hosts render them in a sandboxed iframe with no network
  * by default, so nothing may load from outside the file.
@@ -13,7 +13,7 @@ import { join } from "node:path";
 const ROOT = join(import.meta.dirname, "..");
 await mkdir(join(ROOT, "dist"), { recursive: true });
 
-for (const name of ["timeline", "document"]) {
+for (const name of ["timeline", "view"]) {
   const out = await build({
     entryPoints: [join(ROOT, `src/widget/${name}.ts`)],
     bundle: true,

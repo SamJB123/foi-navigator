@@ -3,9 +3,9 @@
  * the client-held case file as an argument rather than storing anything.
  *
  * Each result is markdown (complete on its own, for tools-only clients) plus the same
- * facts as structuredContent, and a note telling the assistant what to show the user.
- * Two tools carry the timeline MCP App and four the document view; hosts without
- * MCP Apps simply show the text.
+ * facts as structuredContent. Two tools carry the timeline MCP App and the rest (bar
+ * fetch) the FOI view, so what the user must see doesn't depend on the model relaying
+ * it; hosts without MCP Apps get the text, and a short note on what to show from it.
  */
 import {
   CLIENT_CAPABILITIES_META_KEY,
@@ -16,7 +16,8 @@ import {
 } from "@modelcontextprotocol/server";
 import { registerAppTool } from "@modelcontextprotocol/ext-apps/server";
 import { z } from "zod";
-import { Corpus, type Env, MANIFEST, normaliseRef, sourceLabel } from "../corpus.ts";
+import { Corpus, type Env, GUIDELINE_PARTS, MANIFEST, normaliseRef, sourceLabel } from "../corpus.ts";
+import { isRecord, nonEmpty } from "../guards.ts";
 import { type CaseFile, caseFile, isoDate } from "../domain/case-file.ts";
 import { computeTimeline, longDate, todayInCanberra } from "../domain/deadlines.ts";
 import { EXEMPTIONS, EXEMPTION_BY_PROVISION, normaliseProvision, suggestExemptions } from "../domain/exemptions.ts";
@@ -25,9 +26,9 @@ import { aud, estimateCharges } from "../domain/charges.ts";
 import { TEMPLATES, type TemplateId, renderTemplate } from "../domain/templates.ts";
 import { estimateWorkload } from "../domain/workload.ts";
 import { STAGES, STEPS, STEP_BY_ID, type Step, stepsIn } from "../domain/workflow.ts";
-import { DOCUMENT_URI, TIMELINE_URI } from "./app.ts";
-import { type DocumentView, fileSlug } from "./document-view.ts";
+import { TIMELINE_URI, VIEW_URI } from "./app.ts";
 import { partsCited, renderExemption, renderStep, renderTimeline, sourcesLine } from "./render.ts";
+import { CAVEAT_ADVICE, CAVEAT_DATES, type StepDetail, type View, calculatedDates, caseStrip, chargesView, fileSlug, guidelineLinks, processView } from "./views.ts";
 
 const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } as const;
 
@@ -36,33 +37,28 @@ type Text = { type: "text"; text: string; annotations?: { audience?: Audience; p
 type Result = { content: Text[]; structuredContent: Record<string, unknown>; isError?: boolean };
 
 /**
- * The markdown result, plus (when given) a short note telling the assistant how to show
- * it. Hosts collapse tool output, so without the note a model tends to paraphrase a
- * draft or a table the user needed to see. The note is marked for the assistant only.
+ * The markdown result, plus (when given) a short note for the assistant. Where the host
+ * shows the view, the view carries what the user must see; the note only covers hosts
+ * that don't, where a model otherwise tends to paraphrase a draft or a table.
  */
 function result(markdown: string, structured: Record<string, unknown>, present?: string): Result {
   const content: Text[] = [{ type: "text", text: markdown, annotations: { audience: ["user", "assistant"] } }];
-  if (present) content.push({ type: "text", text: `Presenting this result: ${present}`, annotations: { audience: ["assistant"], priority: 1 } });
+  if (present) content.push({ type: "text", text: present, annotations: { audience: ["assistant"], priority: 1 } });
   return { content, structuredContent: structured };
 }
 
+const IF_NO_VIEW = "If the user can see this result's view, don't repeat it: refer to it and add only what helps. If they can't, ";
 const PRESENT = {
-  dates:
-    "tell the user the outcome in a sentence, then show the key dates table as given, decision due date first, with each provision. Use these dates exactly; never recalculate or move them. Keep the case file JSON for the next tool call; show it only if asked.",
-  draft:
-    "this draft is the deliverable. Show it to the user in full and word for word: everything between the two horizontal rules, keeping its headings, wording and [[slots]]. Don't summarise, shorten or rephrase it. After it, list the slots still to fill and offer to fill them; to fill slots, call foi_draft_notice again with details, so the mandatory content stays intact.",
-  charges:
-    "show the user the total and maximum deposit (or the bar on charging, if one applies) and the itemised table as given. Then give the checks and the contention matters as a short summary, in full only if asked.",
-  workload:
-    "show the user the headline estimate, the activity table and the draft evidence statement in full, as given. Summarise the cautions and the must / must not / may consider lists briefly unless asked for them in full.",
-  publicInterest:
-    "show the user any ⚠️ possible irrelevant factors first, in full, with the s 11B(4) paragraph each one hits, then the 'Your factors' table. The factor lists and weighing steps are reference: summarise them unless asked.",
-  step: "give the user this step's checklist as a checklist (with anything under 'For this request' first) and the common errors. Quote the sources only where they help, citing the section or paragraph numbers given.",
-  exemption:
-    "take the user through the elements as a numbered list, then the carve-outs and common errors that apply. Cite the section and paragraph numbers given; don't add provisions from memory.",
-  exemptionList: "show the user the table of exemptions as given, then ask which one to open.",
-  map: "show the user the stages and steps as a list, then ask where their request is up to.",
-  questions: "ask the user these questions directly, as a short list, then call foi_start_request again with the answers.",
+  dates: `${IF_NO_VIEW}show the key dates table as given, decision due first. Never recalculate dates. Keep the case file JSON for the next call.`,
+  draft: `${IF_NO_VIEW}show the draft in full and word for word, with its [[slots]]. Either way, offer to fill the slots by calling foi_draft_notice again with details.`,
+  charges: `${IF_NO_VIEW}show any bar on charging first, then the total, deposit and itemised table as given.`,
+  workload: `${IF_NO_VIEW}show the estimate, the activity table and the draft evidence statement as given.`,
+  publicInterest: `${IF_NO_VIEW}show any ⚠️ irrelevant factors first, in full, then the 'Your factors' table.`,
+  step: `${IF_NO_VIEW}give the step's checklist as a checklist, with anything under 'For this request' first.`,
+  exemption: `${IF_NO_VIEW}take the user through the elements as a numbered list, then the carve-outs and common errors.`,
+  exemptionList: `${IF_NO_VIEW}show the table of exemptions as given.`,
+  map: `${IF_NO_VIEW}show the stages and steps as a list.`,
+  questions: "Ask the user these questions directly, then call foi_start_request again with the answers.",
 };
 
 function toolError(message: string, structured: Record<string, unknown> = {}): Result {
@@ -71,13 +67,24 @@ function toolError(message: string, structured: Record<string, unknown> = {}): R
 
 /** Whether this request's client declared form elicitation (MRTR) — a spec MUST before asking. */
 function canElicit(ctx: ServerContext): boolean {
-  const envelope = ctx.mcpReq.envelope as Record<string, unknown> | undefined;
-  const caps = envelope?.[CLIENT_CAPABILITIES_META_KEY] as { elicitation?: { form?: unknown } } | undefined;
-  return caps?.elicitation?.form !== undefined;
+  const envelope = ctx.mcpReq.envelope;
+  const caps = isRecord(envelope) ? envelope[CLIENT_CAPABILITIES_META_KEY] : undefined;
+  const elicitation = isRecord(caps) ? caps.elicitation : undefined;
+  return isRecord(elicitation) && elicitation.form !== undefined;
 }
 
-const STEP_IDS = STEPS.map((s) => s.id) as [string, ...string[]];
-const TEMPLATE_IDS = TEMPLATES.map((t) => t.id) as [TemplateId, ...TemplateId[]];
+/** What the foi_start_request form can return (the schema it asks with, below). */
+const FACT_ANSWERS = z.object({
+  received_date: z.union([isoDate, z.literal("")]).optional(),
+  in_writing: z.boolean().optional(),
+  states_foi_act: z.boolean().optional(),
+  identifies_documents: z.enum(["yes", "unclear", "no"]).optional(),
+  has_contact_address: z.boolean().optional(),
+  own_personal_information: z.boolean().optional(),
+});
+
+const STEP_IDS = nonEmpty(STEPS.map((s) => s.id));
+const TEMPLATE_IDS = nonEmpty(TEMPLATES.map((t) => t.id));
 const role = z.enum(["officer", "line_area"]).default("officer").describe("officer = FOI practitioner or decision-maker; line_area = business-area staff asked to search or give views");
 
 const timelineOutput = z.looseObject({
@@ -89,21 +96,24 @@ export function registerTools(server: McpServer, env: Env): void {
   const corpus = new Corpus(env);
 
   // ---------------------------------------------------------------------------
-  server.registerTool(
+  registerAppTool(
+    server,
     "foi_process_map",
     {
       title: "FOI process map",
       description:
         "The stages and steps of handling an incoming FOI request under the FOI Act 1982 (Cth), with each step's id and whether this server gives full guided support ('ready') or reference material only ('planned'). " +
-        "Use it to orient a practitioner or line-area officer, then open any step with foi_step_guidance.",
+        "Use it to orient a practitioner or line-area officer, then open any step with foi_step_guidance. Pass the case file to show where the request is up to.",
       inputSchema: z.object({
         role,
         stage: z.enum(["intake", "scope", "search", "exemptions", "decision"]).optional().describe("Only this stage"),
+        case_file: caseFile.optional().describe("Marks the current and completed steps"),
       }),
       outputSchema: z.looseObject({ stages: z.array(z.looseObject({})) }),
       annotations: READ_ONLY,
+      _meta: { ui: { resourceUri: VIEW_URI } },
     },
-    async ({ role, stage }) => {
+    async ({ role, stage, case_file }) => {
       const stages = STAGES.filter((s) => !stage || s.id === stage).map((s) => ({
         ...s,
         steps: stepsIn(s.id)
@@ -119,7 +129,9 @@ export function registerTools(server: McpServer, env: Env): void {
         lines.push("");
       }
       lines.push("**Start a new request:** foi_start_request. **Dates:** foi_calculate_deadlines. **Any step:** foi_step_guidance.", "", sourcesLine());
-      return result(lines.join("\n"), { role, stages }, PRESENT.map);
+      const md = lines.join("\n");
+      const view = processView(role, case_file, undefined, md, {});
+      return result(md, { role, stages, view }, PRESENT.map);
     },
   );
 
@@ -154,10 +166,10 @@ export function registerTools(server: McpServer, env: Env): void {
       _meta: { ui: { resourceUri: TIMELINE_URI } },
     },
     async (input, ctx) => {
-      const facts = { ...input } as Record<string, unknown>;
-      // Fold in answers from an elicitation round, if this is the retry.
-      const answers = acceptedContent<Record<string, unknown>>(ctx.mcpReq.inputResponses, "request_facts");
-      if (answers) for (const [k, v] of Object.entries(answers)) if (v !== undefined && v !== "") facts[k] = v;
+      // Fold in answers from an elicitation round, if this is the retry. A blank date field means "not answered".
+      const answers = acceptedContent(ctx.mcpReq.inputResponses, "request_facts", FACT_ANSWERS);
+      const { received_date: answeredDate, ...answered } = answers ?? {};
+      const facts = { ...input, ...answered, ...(answeredDate ? { received_date: answeredDate } : {}) };
 
       const REQUIRED = ["received_date", "in_writing", "states_foi_act", "identifies_documents", "has_contact_address"] as const;
       const missing = REQUIRED.filter((k) => facts[k] === undefined);
@@ -199,7 +211,7 @@ export function registerTools(server: McpServer, env: Env): void {
           "",
           "Ask the practitioner, then call foi_start_request again with the answers. No applicant names or document content are needed.",
         ].join("\n");
-        return result(md, { status: "needs_information", missing, questions: missing.map((k) => questions[k]) }, PRESENT.questions) as never;
+        return result(md, { status: "needs_information", missing, questions: missing.map((k) => questions[k]) }, PRESENT.questions);
       }
 
       const issues: string[] = [];
@@ -224,7 +236,7 @@ export function registerTools(server: McpServer, env: Env): void {
 
       if (facts.other_agency_more_connected) actions.push("Consider transfer under s 16 — get the other agency's agreement and notify the applicant (step intake.transfer).");
       if (facts.own_personal_information) actions.push("Own personal information: no charges (Charges Regs s 7(1)); s 47F does not apply merely because the information is about the applicant (s 47F(3)).");
-      const tps = (facts.third_parties as string[] | undefined) ?? [];
+      const tps = facts.third_parties ?? [];
       if (tps.length)
         actions.push(
           `Third-party consultation likely (${tps.map((t) => ({ business: "s 27", personal: "s 27A", state: "s 26A", foreign: "s 15(7)" })[t]).join(", ")}): it extends the period by 30 days (s 15(6)/(8)) once notified — start early.`,
@@ -240,7 +252,7 @@ export function registerTools(server: McpServer, env: Env): void {
         completed_steps: validity === "valid" ? ["intake.receive", "intake.validity"] : ["intake.receive"],
         events: [],
       });
-      const asOf = (facts.as_of as string | undefined) ?? todayInCanberra();
+      const asOf = facts.as_of ?? todayInCanberra();
       const tl = computeTimeline(cf, asOf);
 
       const verdict = {
@@ -268,8 +280,8 @@ export function registerTools(server: McpServer, env: Env): void {
       return result(
         md,
         { validity, issues, actions, case_file: cf, timeline: tl },
-        `start with the verdict (valid or not, and why) and any issues, then ${PRESENT.dates}`,
-      ) as never;
+        `Start with the verdict (valid or not, and why) and any issues. ${PRESENT.dates}`,
+      );
     },
   );
 
@@ -294,12 +306,13 @@ export function registerTools(server: McpServer, env: Env): void {
     async ({ case_file, as_of }) => {
       const tl = computeTimeline(case_file, as_of ?? todayInCanberra());
       const md = [renderTimeline(tl), "", "```json", JSON.stringify(case_file), "```", "", sourcesLine(["3"])].join("\n");
-      return result(md, { case_file, timeline: tl }, PRESENT.dates) as never;
+      return result(md, { case_file, timeline: tl }, PRESENT.dates);
     },
   );
 
   // ---------------------------------------------------------------------------
-  server.registerTool(
+  registerAppTool(
+    server,
     "foi_step_guidance",
     {
       title: "Guidance for an FOI step",
@@ -313,9 +326,11 @@ export function registerTools(server: McpServer, env: Env): void {
       }),
       outputSchema: z.looseObject({ step: z.looseObject({ id: z.string() }), excerpts: z.array(z.looseObject({})) }),
       annotations: READ_ONLY,
+      _meta: { ui: { resourceUri: VIEW_URI } },
     },
     async ({ step: stepId, role, case_file }) => {
-      const step = STEP_BY_ID.get(stepId) as Step;
+      const step = STEP_BY_ID.get(stepId);
+      if (!step) return toolError(`No step "${stepId}". See foi_process_map for step ids.`);
       const excerpts = await corpus.many(await expandReads(corpus, step.read));
       const tailored: string[] = [];
       if (case_file) {
@@ -328,13 +343,35 @@ export function registerTools(server: McpServer, env: Env): void {
       }
       const md = [renderStep(step, role, excerpts, tailored), "", sourcesLine(partsCited(step.read))].join("\n");
       const next = case_file ? { ...case_file, stage: step.id } : undefined;
+      const checklist = step.checklist.filter((c) => !c.roles || c.roles.includes(role));
+      const detail: StepDetail = {
+        id: step.id,
+        title: step.title,
+        purpose: step.purpose,
+        when: step.when,
+        tailored,
+        line_area: role === "line_area" ? (step.line_area ?? []) : [],
+        checklist: checklist.map((c) => c.text),
+        pitfalls: step.pitfalls,
+        templates: step.templates ?? [],
+        next: step.next,
+        excerpts: excerpts.map((e) => ({
+          ref: e.ref,
+          label: `${sourceLabel(e)} ${e.ref}${e.source === "guidelines" ? "" : ` (${e.title})`}`,
+          url: e.url,
+          text: e.text.replace(/\n\n\[\^[\s\S]*$/, "").replace(/\s+/g, " ").slice(0, 600),
+        })),
+      };
+      const links = await guidelineLinks(corpus, [...detail.checklist, ...detail.pitfalls, ...detail.line_area]);
+      const view = processView(role, next, detail, md, links);
       return result(
         md,
         {
-          step: { ...step, checklist: step.checklist.filter((c) => !c.roles || c.roles.includes(role)) },
+          step: { ...step, checklist },
           role,
           excerpts: excerpts.map((e) => ({ id: e.id, ref: e.ref, source: sourceLabel(e), title: e.title, url: e.url, text: e.text })),
           ...(next ? { case_file: next } : {}),
+          view,
         },
         PRESENT.step,
       );
@@ -342,7 +379,8 @@ export function registerTools(server: McpServer, env: Env): void {
   );
 
   // ---------------------------------------------------------------------------
-  server.registerTool(
+  registerAppTool(
+    server,
     "foi_exemption_guide",
     {
       title: "Exemption guide",
@@ -355,6 +393,7 @@ export function registerTools(server: McpServer, env: Env): void {
       }),
       outputSchema: z.looseObject({}),
       annotations: READ_ONLY,
+      _meta: { ui: { resourceUri: VIEW_URI } },
     },
     async ({ provision, information }) => {
       if (provision) {
@@ -368,15 +407,20 @@ export function registerTools(server: McpServer, env: Env): void {
         const section = await corpus.unit(`act:s${e.provision}`);
         const paras = await corpus.many(e.key_paragraphs);
         const md = [renderExemption(e, section?.kind === "passage" ? section.text : null, paras), "", sourcesLine([String(e.guidelines.part)])].join("\n");
-        return result(
-          md,
-          {
-            exemption: e,
-            section_text: section?.kind === "passage" ? section.text : null,
-            key_paragraphs: paras.map((p) => ({ id: p.id, ref: p.ref, title: p.title, url: p.url, text: p.text })),
-          },
-          PRESENT.exemption,
-        );
+        const key_paragraphs = paras.map((p) => ({ id: p.id, ref: p.ref, title: p.title, url: p.url, text: p.text }));
+        const view: View = {
+          kind: "exemption",
+          title: `s ${e.provision} — ${e.name}`,
+          subtitle: e.kind === "exempt" ? "Exemption · Part IV Division 2" : "Conditional exemption · Part IV Division 3 · public interest test required",
+          exemption: e,
+          section_text: section?.kind === "passage" ? section.text : null,
+          key_paragraphs: key_paragraphs.map((p) => ({ ...p, text: p.text.replace(/\n\n\[\^[\s\S]*$/, "").replace(/\s+/g, " ").slice(0, 700) })),
+          links: await guidelineLinks(corpus, [...e.elements, ...(e.carve_outs ?? []), ...e.pitfalls, e.consultation ?? "", e.harm_test ?? "", e.summary]),
+          caveats: [CAVEAT_ADVICE],
+          body: md,
+          filename: fileSlug("exemption", e.provision),
+        };
+        return result(md, { exemption: e, section_text: view.section_text, key_paragraphs, view }, PRESENT.exemption);
       }
       const candidates = information ? suggestExemptions(information) : [];
       const list = candidates.length ? candidates : EXEMPTIONS;
@@ -395,12 +439,25 @@ export function registerTools(server: McpServer, env: Env): void {
         "",
         sourcesLine(["5", "6"]),
       ].join("\n");
-      return result(md, { candidates: list.map(({ provision, name, kind, summary }) => ({ provision, name, kind, summary })) }, PRESENT.exemptionList);
+      const rows = list.map(({ provision, name, kind, summary }) => ({ provision, name, kind, summary }));
+      const view: View = {
+        kind: "exemption_list",
+        title: information ? (candidates.length ? "Exemptions that may apply" : "No exemption matched by type") : "Exemptions in Part IV",
+        subtitle: information ? `For: ${information}` : "ss 33–47J of the FOI Act",
+        information,
+        matched: candidates.length > 0,
+        candidates: rows,
+        links: {},
+        caveats: ["Candidates are a starting point: each element must be established on the evidence.", CAVEAT_ADVICE],
+        body: md,
+        filename: "exemptions",
+      };
+      return result(md, { candidates: rows, view }, PRESENT.exemptionList);
     },
   );
 
   // ---------------------------------------------------------------------------
-  const CONDITIONAL = EXEMPTIONS.filter((e) => e.kind === "conditional").map((e) => e.provision) as [string, ...string[]];
+  const CONDITIONAL = nonEmpty(EXEMPTIONS.filter((e) => e.kind === "conditional").map((e) => e.provision));
   registerAppTool(
     server,
     "foi_public_interest_test",
@@ -417,13 +474,14 @@ export function registerTools(server: McpServer, env: Env): void {
       }),
       outputSchema: z.looseObject({ checks: z.array(z.looseObject({})) }),
       annotations: READ_ONLY,
-      _meta: { ui: { resourceUri: DOCUMENT_URI } },
+      _meta: { ui: { resourceUri: VIEW_URI } },
     },
     async ({ provision, factors_for, factors_against }) => {
       const checks = checkFactors(factors_for, factors_against);
       const flagged = checks.filter((c) => c.flags.length);
       const frank = checks.filter((c) => c.frankness);
-      const e = EXEMPTION_BY_PROVISION.get(provision)!;
+      const e = EXEMPTION_BY_PROVISION.get(provision);
+      if (!e) return toolError(`s ${provision} is not a conditional exemption. Conditional exemptions: ${CONDITIONAL.map((p) => `s ${p}`).join(", ")}.`);
       const lines = [`## Public interest test — s ${provision} (${e.name})`, ""];
       if (flagged.length) {
         lines.push("### ⚠️ Possible irrelevant factors (s 11B(4)) — these must not be taken into account");
@@ -448,19 +506,20 @@ export function registerTools(server: McpServer, env: Env): void {
       if (!checks.length) lines.push("| — | none given | |");
       lines.push("", "### Weighing", ...WEIGHING_STEPS.map((s, i) => `${i + 1}. ${s}`), "", sourcesLine(["6"]));
       const md = lines.join("\n");
-      const view: DocumentView = {
-        kind: "report",
+      const view: View = {
+        kind: "public_interest",
         title: `Public interest test — s ${provision}`,
         subtitle: `${e.name} · ss 11A(5), 11B`,
-        headline: [
-          { label: "Factors for access", value: String(factors_for.length) },
-          { label: "Factors against", value: String(factors_against.length) },
-          { label: "Possible irrelevant factors", value: String(flagged.length) },
-        ],
-        flags: [
-          ...flagged.map((c) => `**"${c.factor}"** looks like ${c.flags.map((f) => f.id).join(", ")}: it must not be taken into account.`),
-          ...frank.map((c) => `**"${c.factor}"** is a frankness and candour claim: it needs specific evidence ([6.245]–[6.252]).`),
-        ],
+        provision,
+        name: e.name,
+        checks,
+        statutory_for: STATUTORY_FOR,
+        irrelevant: IRRELEVANT.map(({ id, text }) => ({ id, text })),
+        guidelines_for: GUIDELINES_FOR,
+        guidelines_against: GUIDELINES_AGAINST,
+        weighing_steps: WEIGHING_STEPS,
+        links: await guidelineLinks(corpus, [...WEIGHING_STEPS, "[6.231] [6.233] [6.234] [6.245]"]),
+        caveats: ["The irrelevant-factor check flags wording; it does not decide. The decision-maker weighs the factors and explains the weight given.", CAVEAT_ADVICE],
         body: md,
         filename: fileSlug("public-interest", provision),
       };
@@ -477,7 +536,7 @@ export function registerTools(server: McpServer, env: Env): void {
           view,
         },
         PRESENT.publicInterest,
-      ) as never;
+      );
     },
   );
 
@@ -498,7 +557,7 @@ export function registerTools(server: McpServer, env: Env): void {
       }),
       outputSchema: z.looseObject({ text: z.string(), must_include: z.array(z.string()), unfilled: z.array(z.string()) }),
       annotations: READ_ONLY,
-      _meta: { ui: { resourceUri: DOCUMENT_URI } },
+      _meta: { ui: { resourceUri: VIEW_URI } },
     },
     async ({ template, case_file, details }) => {
       const tl = case_file ? computeTimeline(case_file) : undefined;
@@ -518,12 +577,18 @@ export function registerTools(server: McpServer, env: Env): void {
         "",
         "_A draft for the officer to check and adopt; the decision-maker must personally endorse any reasoning ([3.298])._",
       ].join("\n");
-      const view: DocumentView = {
+      const view: View = {
         kind: "draft",
         title: t.title,
         subtitle: [case_file?.reference, `for the ${t.audience.replace("_", " ")}`, t.provisions.join(", ")].filter(Boolean).join(" · "),
+        template: t.id,
+        audience: t.audience,
         must_include: t.must_include,
         unfilled,
+        calculated: calculatedDates(case_file, tl),
+        case: case_file && tl ? caseStrip(case_file, tl) : undefined,
+        links: await guidelineLinks(corpus, [text]),
+        caveats: ["A draft for the officer to check and adopt; the decision-maker must personally endorse any reasoning ([3.298]).", ...(case_file ? [CAVEAT_DATES] : []), CAVEAT_ADVICE],
         body: text,
         filename: fileSlug(case_file?.reference, t.id),
       };
@@ -531,7 +596,7 @@ export function registerTools(server: McpServer, env: Env): void {
         md,
         { template: t.id, title: t.title, audience: t.audience, provisions: t.provisions, must_include: t.must_include, text, unfilled, view },
         PRESENT.draft,
-      ) as never;
+      );
     },
   );
 
@@ -559,7 +624,7 @@ export function registerTools(server: McpServer, env: Env): void {
       }),
       outputSchema: z.looseObject({ total: z.number(), chargeable: z.boolean(), lines: z.array(z.looseObject({})) }),
       annotations: READ_ONLY,
-      _meta: { ui: { resourceUri: DOCUMENT_URI } },
+      _meta: { ui: { resourceUri: VIEW_URI } },
     },
     async ({ case_file, ...input }) => {
       const tl = case_file ? computeTimeline(case_file) : undefined;
@@ -587,22 +652,8 @@ export function registerTools(server: McpServer, env: Env): void {
         "",
         sourcesLine(["4"]),
       ].join("\n");
-      const view: DocumentView = {
-        kind: "report",
-        title: `Charges — preliminary assessment${case_file?.reference ? ` for ${case_file.reference}` : ""}`,
-        subtitle: "FOI (Charges) Regulations 2019 · s 29(1)",
-        headline: res.barred_by
-          ? [{ label: "Charge", value: "$0.00" }]
-          : [
-              { label: "Total", value: aud(res.total) },
-              { label: "Maximum deposit", value: aud(res.deposit_maximum) },
-              { label: "Free decision hours", value: `${res.free_decision_hours} h` },
-            ],
-        flags: res.barred_by ? [res.barred_by] : [],
-        body: md,
-        filename: fileSlug(case_file?.reference, "charges-assessment"),
-      };
-      return result(md, { ...res, view }, PRESENT.charges) as never;
+      const view = chargesView(res, input.decision_hours ?? 0, case_file, md, await guidelineLinks(corpus, [...res.notes, ...res.waiver_considerations, res.barred_by ?? ""]));
+      return result(md, { ...res, view }, PRESENT.charges);
     },
   );
 
@@ -630,7 +681,7 @@ export function registerTools(server: McpServer, env: Env): void {
       }),
       outputSchema: z.looseObject({ total_hours: z.number(), lines: z.array(z.looseObject({})), evidence_statement: z.string() }),
       annotations: READ_ONLY,
-      _meta: { ui: { resourceUri: DOCUMENT_URI } },
+      _meta: { ui: { resourceUri: VIEW_URI } },
     },
     async (input) => {
       const res = estimateWorkload(input);
@@ -664,26 +715,36 @@ export function registerTools(server: McpServer, env: Env): void {
         "",
         sourcesLine(["3"]),
       ].join("\n");
-      const view: DocumentView = {
-        kind: "report",
+      const view: View = {
+        kind: "workload",
         title: "Practical refusal — workload estimate",
-        subtitle: `Sample of ${input.sample_documents} of ${input.documents_in_scope} documents (${res.sample_percent}%) · s 24AA`,
-        headline: [
-          { label: "Estimated work", value: `${res.total_hours} h` },
-          { label: "Working days", value: String(res.total_days) },
-          ...(res.fte_weeks !== undefined ? [{ label: "FOI team weeks", value: String(res.fte_weeks) }] : []),
+        subtitle: "s 24AA(1)(a) · for a s 24AB notice",
+        total_hours: res.total_hours,
+        total_days: res.total_days,
+        fte_weeks: res.fte_weeks,
+        sample: `Sample of ${input.sample_documents} of ${input.documents_in_scope} documents (${res.sample_percent}%), scaled ×${res.scale}`,
+        lines: res.lines,
+        evidence_statement: res.evidence_statement,
+        cautions: res.cautions,
+        must_consider: res.must_consider,
+        must_not_consider: res.must_not_consider,
+        may_consider: res.may_consider,
+        revision_suggestions: res.revision_suggestions,
+        links: await guidelineLinks(corpus, [...res.cautions, ...res.must_consider, ...res.must_not_consider, ...res.may_consider, ...res.revision_suggestions]),
+        caveats: [
+          "Not a threshold test: there is no number of hours that makes a request a practical refusal ([3.208]). The decision-maker must be satisfied the work would substantially and unreasonably divert resources (s 24AA(1)(a)).",
+          CAVEAT_ADVICE,
         ],
-        flags: res.cautions.slice(0, 2),
-        extract: { label: "evidence statement", text: res.evidence_statement },
         body: md,
         filename: "practical-refusal-workload-estimate",
       };
-      return result(md, { ...res, view }, PRESENT.workload) as never;
+      return result(md, { ...res, view }, PRESENT.workload);
     },
   );
 
   // ---------------------------------------------------------------------------
-  server.registerTool(
+  registerAppTool(
+    server,
     "search",
     {
       title: "Search the FOI Act and Guidelines",
@@ -698,6 +759,7 @@ export function registerTools(server: McpServer, env: Env): void {
       }),
       outputSchema: z.looseObject({ results: z.array(z.looseObject({ id: z.string(), title: z.string(), url: z.string() })) }),
       annotations: READ_ONLY,
+      _meta: { ui: { resourceUri: VIEW_URI } },
     },
     async ({ query, source, part, limit }) => {
       const { hits, mode } = await corpus.search(query, { source, part, limit });
@@ -711,8 +773,20 @@ export function registerTools(server: McpServer, env: Env): void {
         snippet: h.snippet,
         matched_by: h.matched_by,
       }));
-      // OpenAI's search contract: structured results mirrored as JSON text.
-      return { content: [{ type: "text", text: JSON.stringify({ results, mode }) }], structuredContent: { results, mode } };
+      const view: View = {
+        kind: "search",
+        title: "Search the Act and Guidelines",
+        subtitle: query,
+        query,
+        mode,
+        results: results.map(({ id, ref, source, title, heading, snippet, url }) => ({ id, ref, source, title, heading, snippet, url })),
+        links: {},
+        caveats: ["Excerpts only: read the authoritative text before relying on a passage.", CAVEAT_ADVICE],
+        body: results.map((r) => `- **${r.title}** — ${r.snippet} (${r.url})`).join("\n"),
+        filename: fileSlug("search", query),
+      };
+      // OpenAI's search contract: structured results mirrored as JSON text (the view rides alongside).
+      return { content: [{ type: "text", text: JSON.stringify({ results, mode }) }], structuredContent: { results, mode, view } };
     },
   );
 
@@ -738,7 +812,7 @@ export function registerTools(server: McpServer, env: Env): void {
       const label = unit.source === "guidelines" ? `FOI Guidelines ${unit.part} ${unit.ref}` : `${sourceLabel(unit)} ${unit.ref}`;
       const versions =
         unit.source === "guidelines"
-          ? (MANIFEST.guidelines as Record<string, { version: string; updated: string }>)[unit.part.replace("Part ", "")]
+          ? GUIDELINE_PARTS[unit.part.replace("Part ", "")]
           : MANIFEST.legislation[unit.source as "act" | "regs"];
       const doc = {
         id: unit.id,

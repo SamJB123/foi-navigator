@@ -387,7 +387,7 @@ export function computeTimeline(cf: CaseFile, asOf: string = todayInCanberra()):
   if (effectiveDue) {
     keyDates.push({
       id: "decision_due",
-      label: rolled ? `Notify the decision by (rolled forward from ${longDate(statutoryDue!)}, a weekend)` : "Notify the decision by",
+      label: statutoryDue && rolled ? `Notify the decision by (rolled forward from ${longDate(statutoryDue)}, a weekend)` : "Notify the decision by",
       date: effectiveDue,
       provision: "s 15(5)(b), [3.247]",
       kind: "deadline",

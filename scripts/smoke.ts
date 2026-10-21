@@ -5,12 +5,14 @@
  *
  *   node scripts/smoke.ts [https://foi-navigator.aicolab.workers.dev/mcp]
  */
+import { z } from "zod";
+
 const URL_ = process.argv[2] ?? "https://foi-navigator.aicolab.workers.dev/mcp";
 let id = 1;
 let failures = 0;
 
 async function rpc(method: string, params: Record<string, unknown> = {}, era: "legacy" | "modern" = "legacy") {
-  const name = (params.name ?? params.uri) as string | undefined;
+  const name = typeof params.name === "string" ? params.name : typeof params.uri === "string" ? params.uri : undefined;
   const headers: Record<string, string> = { "content-type": "application/json", accept: "application/json, text/event-stream" };
   let body: Record<string, unknown> = { jsonrpc: "2.0", id: id++, method, params };
   if (era === "legacy") headers["mcp-protocol-version"] = "2025-06-18";
@@ -30,7 +32,7 @@ async function rpc(method: string, params: Record<string, unknown> = {}, era: "l
   }
   const res = await fetch(URL_, { method: "POST", headers, body: JSON.stringify(body) });
   const text = await res.text();
-  const json = JSON.parse(/^(event|data):/m.test(text.slice(0, 20)) ? text.split("\n").filter((l) => l.startsWith("data:")).pop()!.slice(5) : text);
+  const json = JSON.parse(/^(event|data):/m.test(text.slice(0, 20)) ? (text.split("\n").filter((l) => l.startsWith("data:")).pop() ?? "data:{}").slice(5) : text);
   if (json.error) throw new Error(`${method} ${name ?? ""}: ${JSON.stringify(json.error)}`);
   return json.result;
 }
@@ -42,7 +44,7 @@ function check(ok: unknown, label: string) {
 
 for (const era of ["legacy", "modern"] as const) {
   console.log(`\n== ${era}`);
-  const tools = (await rpc("tools/list", {}, era)).tools as { name: string }[];
+  const tools = z.array(z.object({ name: z.string() })).parse((await rpc("tools/list", {}, era)).tools);
   check(tools.length === 11, `tools/list: ${tools.map((t) => t.name).join(", ")}`);
   const ch = await rpc("tools/call", { name: "foi_estimate_charges", arguments: { search_hours: 6, decision_hours: 12 } }, era);
   check(ch.structuredContent?.total === 230 && ch.structuredContent?.deposit_maximum === 57.5, "foi_estimate_charges → $230, deposit $57.50");

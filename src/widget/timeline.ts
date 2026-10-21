@@ -8,14 +8,14 @@
  * ui/update-model-context so the conversation stays in step.
  */
 import { App, applyDocumentTheme, applyHostStyleVariables } from "@modelcontextprotocol/ext-apps";
-import { type CaseFile, EVENT_LABELS, EVENT_TYPES } from "../domain/case-file.ts";
+import { type CaseFile, EVENT_LABELS, EVENT_TYPES, caseEvent, caseFile } from "../domain/case-file.ts";
 import { type Timeline, computeTimeline, longDate, todayInCanberra } from "../domain/deadlines.ts";
+import { isRecord } from "../guards.ts";
+import { esc } from "./markdown.ts";
 
 const app = new App({ name: "FOI deadline timeline", version: "1.0.0" }, {});
-const root = document.getElementById("app")!;
+const root = document.getElementById("app") ?? document.body;
 let current: { cf: CaseFile; tl: Timeline } | null = null;
-
-const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
 const ICON: Record<string, string> = { met: "✓", missed: "✕", upcoming: "•", due_today: "!", overdue: "✕", info: "·" };
 
@@ -85,41 +85,54 @@ function render() {
         <option value="paid">charge paid</option><option value="deposit_paid">deposit paid</option><option value="not_imposed">charge not imposed</option>
       </select>
       <button type="submit">Add</button>
+      <span id="addStatus" class="note" aria-live="polite"></span>
     </form>
     <div class="actions">
       <button id="ask" type="button">Ask what to do next</button>
-    </div>`;
+    </div>
+    <footer class="caveats">
+      <p>Dates count calendar days and move weekend due dates to the next business day ([3.247]). <strong>Public holidays are not checked</strong>: if a date falls on one, it moves to the next business day.</p>
+      <p>Guidance only, not legal advice. Decisions are made by an authorised officer (s 23).</p>
+    </footer>`;
 
-  document.getElementById("add")!.addEventListener("submit", (ev) => {
-    ev.preventDefault();
-    const f = new FormData(ev.target as HTMLFormElement);
-    const event = {
-      type: f.get("type") as CaseFile["events"][number]["type"],
-      date: String(f.get("date")),
-      ...(f.get("days") ? { days: Number(f.get("days")) } : {}),
-      ...(f.get("outcome") ? { outcome: f.get("outcome") as CaseFile["events"][number]["outcome"] } : {}),
-    };
-    const cf2: CaseFile = { ...current!.cf, events: [...(current!.cf.events ?? []), event] };
-    show(cf2);
-    void app
-      .updateModelContext({
-        content: [{ type: "text", text: `The officer recorded "${EVENT_LABELS[event.type]}" on ${event.date} in the deadline timeline. Updated case file:\n${JSON.stringify(cf2)}` }],
-        structuredContent: { case_file: cf2 },
-      })
-      .catch(() => {});
-  });
-  document.getElementById("ask")!.addEventListener("click", () => {
+  const form = document.getElementById("add");
+  const status = document.getElementById("addStatus");
+  if (form instanceof HTMLFormElement)
+    form.addEventListener("submit", (ev) => {
+      ev.preventDefault();
+      const f = new FormData(form);
+      const parsed = caseEvent.safeParse({
+        type: f.get("type"),
+        date: f.get("date"),
+        ...(f.get("days") ? { days: Number(f.get("days")) } : {}),
+        ...(f.get("outcome") ? { outcome: f.get("outcome") } : {}),
+      });
+      if (!parsed.success) {
+        if (status) status.textContent = "Check the event: it needs a type and a date, and days only for extensions.";
+        return;
+      }
+      const event = parsed.data;
+      const cf2: CaseFile = { ...cf, events: [...(cf.events ?? []), event] };
+      show(cf2);
+      void app
+        .updateModelContext({
+          content: [{ type: "text", text: `The officer recorded "${EVENT_LABELS[event.type]}" on ${event.date} in the deadline timeline. Updated case file:\n${JSON.stringify(cf2)}` }],
+          structuredContent: { case_file: cf2 },
+        })
+        .catch(() => {});
+    });
+  document.getElementById("ask")?.addEventListener("click", () => {
     void app
       .sendMessage({
         role: "user",
-        content: [{ type: "text", text: `Using this case file, what should I do next on this FOI request?\n${JSON.stringify(current!.cf)}` }],
+        content: [{ type: "text", text: `Using this case file, what should I do next on this FOI request?\n${JSON.stringify(cf)}` }],
       })
       .catch(() => {});
   });
 }
 
-function show(cf: CaseFile, tl?: Timeline) {
-  current = { cf, tl: tl ?? computeTimeline(cf, todayInCanberra()) };
+function show(cf: CaseFile, asOf: string = todayInCanberra()) {
+  current = { cf, tl: computeTimeline(cf, asOf) };
   render();
 }
 
@@ -129,12 +142,16 @@ function applyHost(ctx: ReturnType<typeof app.getHostContext>) {
 }
 
 app.ontoolresult = (params) => {
-  const sc = params.structuredContent as { case_file?: CaseFile; timeline?: Timeline } | undefined;
-  if (sc?.case_file) show(sc.case_file, sc.timeline);
+  const sc = params.structuredContent;
+  const parsed = caseFile.safeParse(isRecord(sc) ? sc.case_file : undefined);
+  if (!parsed.success) return;
+  // Recalculate here with the server's as-at date, so the view and the text agree.
+  const asOf = isRecord(sc) && isRecord(sc.timeline) && typeof sc.timeline.as_of === "string" ? sc.timeline.as_of : undefined;
+  show(parsed.data, asOf);
 };
 app.ontoolinput = (params) => {
-  const args = params.arguments as { case_file?: CaseFile } | undefined;
-  if (args?.case_file && !current) show(args.case_file);
+  const parsed = caseFile.safeParse(params.arguments?.case_file);
+  if (parsed.success && !current) show(parsed.data);
 };
 app.onhostcontextchanged = (ctx) => applyHost(ctx);
 

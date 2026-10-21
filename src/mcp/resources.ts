@@ -5,10 +5,14 @@
  * clients cannot read resources.
  */
 import { type McpServer, ResourceTemplate } from "@modelcontextprotocol/server";
-import { Corpus, type Env, MANIFEST } from "../corpus.ts";
+import { z } from "zod";
+import { Corpus, type Env, GUIDELINE_PARTS, MANIFEST } from "../corpus.ts";
 import { EXEMPTIONS, EXEMPTION_BY_PROVISION, normaliseProvision } from "../domain/exemptions.ts";
 import { STAGES, stepsIn } from "../domain/workflow.ts";
 import { DISCLAIMER, renderExemption } from "./render.ts";
+
+const SECTION_ROWS = z.array(z.object({ parent: z.string(), ref: z.string(), title: z.string() }));
+const PARENT_ROWS = z.array(z.object({ parent: z.string() }));
 
 const DAY_MS = 86_400_000;
 const cacheHint = { ttlMs: DAY_MS, cacheScope: "public" as const };
@@ -84,11 +88,9 @@ export function registerResources(server: McpServer, env: Env): void {
     "act-section",
     new ResourceTemplate("foi://act/{section}", {
       list: async () => {
-        const { results } = await env.DB.prepare("SELECT DISTINCT parent, ref, title FROM passages WHERE source = 'act' AND parent LIKE 'act:s%' ORDER BY ord").all<{
-          parent: string;
-          ref: string;
-          title: string;
-        }>();
+        const results = SECTION_ROWS.parse(
+          (await env.DB.prepare("SELECT DISTINCT parent, ref, title FROM passages WHERE source = 'act' AND parent LIKE 'act:s%' ORDER BY ord").all()).results,
+        );
         const seen = new Set<string>();
         return {
           resources: results
@@ -100,8 +102,8 @@ export function registerResources(server: McpServer, env: Env): void {
         section: async (value) => {
           const { results } = await env.DB.prepare("SELECT DISTINCT parent FROM passages WHERE source = 'act' AND parent LIKE ? ORDER BY ord LIMIT 20")
             .bind(`act:s${value.toUpperCase()}%`)
-            .all<{ parent: string }>();
-          return results.map((r) => r.parent.slice(5));
+            .all();
+          return PARENT_ROWS.parse(results).map((r) => r.parent.slice(5));
         },
       },
     }),
@@ -128,7 +130,7 @@ export function registerResources(server: McpServer, env: Env): void {
     "guidelines-part",
     new ResourceTemplate("foi://guidelines/part/{part}", {
       list: async () => ({
-        resources: Object.entries(MANIFEST.guidelines as Record<string, { title: string }>).map(([n, g]) => ({
+        resources: Object.entries(GUIDELINE_PARTS).map(([n, g]) => ({
           uri: `foi://guidelines/part/${n}`,
           name: g.title,
           mimeType: "text/markdown",
@@ -139,7 +141,7 @@ export function registerResources(server: McpServer, env: Env): void {
     async (uri, { part }) => {
       const unit = await corpus.unit(`gl:part${part}`);
       if (!unit || unit.kind !== "outline") return md(uri, `No Guidelines Part ${part}.`);
-      const meta = (MANIFEST.guidelines as Record<string, { version: string; updated: string }>)[String(part)];
+      const meta = GUIDELINE_PARTS[String(part)];
       return md(
         uri,
         [`# ${unit.title}`, `_Version ${meta?.version}, ${meta?.updated} · ${unit.url}_`, "", ...unit.sections.map((s) => `- ${s.from}–${s.to} ${s.heading}`)].join("\n"),

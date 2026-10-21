@@ -17,7 +17,7 @@ export const INSTRUCTIONS = `Guides Australian Government FOI practitioners and 
 
 Typical flow: foi_start_request (new request → case file and dates) → foi_step_guidance for each step → foi_estimate_workload (practical refusal) and foi_estimate_charges (s 29) where relevant → foi_exemption_guide and foi_public_interest_test when examining documents → foi_draft_notice for letters → foi_calculate_deadlines whenever an event happens (acknowledgement, extension, consultation, charge, decision, access). foi_process_map shows all steps.
 
-Results are for the user. Show drafts from foi_draft_notice in full, word for word; show date, charges and workload tables as given, not paraphrased. Each result ends with a short note on what to show.
+Most tools show the user a view of their result (drafts, tables, warnings, the case file). Where the user can see it, don't repeat it; where they can't, show drafts word for word and tables as given, not paraphrased.
 
 The case file is client-held JSON: each tool that returns one expects it back, with new events appended. The server stores nothing.
 
@@ -27,7 +27,8 @@ Dates come from foi_calculate_deadlines (calendar days; weekends roll forward; p
 
 Decisions remain with an authorised officer (s 23); outputs are drafts and guidance, not legal advice.`;
 
-const DAY = { ttlMs: 86_400_000, cacheScope: "public" as const };
+// An hour, not a day: tool and app metadata changes with each release, and hosts should pick it up the same day.
+const HOUR: { ttlMs: number; cacheScope: "public" } = { ttlMs: 3_600_000, cacheScope: "public" };
 
 export function buildServer(env: Env): McpServer {
   const server = new McpServer(
@@ -35,11 +36,11 @@ export function buildServer(env: Env): McpServer {
     {
       instructions: INSTRUCTIONS,
       cacheHints: {
-        "tools/list": DAY,
-        "prompts/list": DAY,
-        "resources/list": DAY,
-        "resources/templates/list": DAY,
-        "server/discover": DAY,
+        "tools/list": HOUR,
+        "prompts/list": HOUR,
+        "resources/list": HOUR,
+        "resources/templates/list": HOUR,
+        "server/discover": HOUR,
       },
     },
   );

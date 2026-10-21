@@ -7,6 +7,7 @@
  * search falls back to FTS alone and says so. A query that names a provision
  * ("s 47F", "[6.123]") puts that passage first.
  */
+import { z } from "zod";
 import manifest from "../data/content/manifest.json" with { type: "json" };
 
 export type Env = Cloudflare.Env & { ADMIN_TOKEN?: string };
@@ -14,18 +15,32 @@ export type Env = Cloudflare.Env & { ADMIN_TOKEN?: string };
 export const EMBEDDING_MODEL = "@cf/baai/bge-m3";
 export const MANIFEST = manifest;
 
-export type PassageRow = {
-  id: string;
-  source: "act" | "regs" | "guidelines";
-  ref: string;
-  parent: string;
-  part: string;
-  heading: string;
-  title: string;
-  text: string;
-  url: string;
-  ord: number;
-};
+export type GuidelinePart = { title: string; version: string; updated: string; url: string; paragraphs: number };
+/** The Guidelines parts by number ("1"…"15"), indexable by any string. */
+export const GUIDELINE_PARTS: Record<string, GuidelinePart> = manifest.guidelines;
+
+/** Embed texts with bge-m3; null if the model returned no vectors. */
+export async function embed(ai: Ai, text: string[]): Promise<number[][] | null> {
+  const out = await ai.run(EMBEDDING_MODEL, { text });
+  return "data" in out && out.data?.length ? out.data : null;
+}
+
+/** A row of the passages table. D1 rows are untyped, so every query result is parsed with this. */
+export const passageRow = z.object({
+  id: z.string(),
+  source: z.enum(["act", "regs", "guidelines"]),
+  ref: z.string(),
+  parent: z.string(),
+  part: z.string(),
+  heading: z.string(),
+  title: z.string(),
+  text: z.string(),
+  url: z.string(),
+  ord: z.number(),
+});
+export const passageRows = z.array(passageRow);
+const snippetRows = z.array(passageRow.extend({ snip: z.string() }));
+export type PassageRow = z.infer<typeof passageRow>;
 
 export type SearchHit = {
   id: string;
@@ -91,7 +106,7 @@ export class Corpus {
   }
 
   async get(id: string): Promise<PassageRow | null> {
-    return this.env.DB.prepare("SELECT * FROM passages WHERE id = ?").bind(id).first<PassageRow>();
+    return passageRow.nullable().parse(await this.env.DB.prepare("SELECT * FROM passages WHERE id = ?").bind(id).first());
   }
 
   async many(ids: string[]): Promise<PassageRow[]> {
@@ -100,16 +115,14 @@ export class Corpus {
       `SELECT * FROM passages WHERE id IN (${ids.map(() => "?").join(",")})`,
     )
       .bind(...ids)
-      .all<PassageRow>();
-    const byId = new Map(results.map((r) => [r.id, r]));
-    return ids.map((id) => byId.get(id)).filter((r): r is PassageRow => !!r);
+      .all();
+    const byId = new Map(passageRows.parse(results).map((r) => [r.id, r]));
+    return ids.flatMap((id) => byId.get(id) ?? []);
   }
 
   async children(parent: string): Promise<PassageRow[]> {
-    const { results } = await this.env.DB.prepare("SELECT * FROM passages WHERE parent = ? ORDER BY ord")
-      .bind(parent)
-      .all<PassageRow>();
-    return results;
+    const { results } = await this.env.DB.prepare("SELECT * FROM passages WHERE parent = ? ORDER BY ord").bind(parent).all();
+    return passageRows.parse(results);
   }
 
   /** Guidelines paragraphs from one to another, inclusive, in order. */
@@ -118,8 +131,8 @@ export class Corpus {
       `SELECT * FROM passages WHERE ord BETWEEN (SELECT ord FROM passages WHERE id = ?) AND (SELECT ord FROM passages WHERE id = ?) ORDER BY ord LIMIT ?`,
     )
       .bind(fromId, toId, limit)
-      .all<PassageRow>();
-    return results;
+      .all();
+    return passageRows.parse(results);
   }
 
   /**
@@ -145,7 +158,7 @@ export class Corpus {
           last.paragraphs++;
         } else sections.push({ heading: h, from: r.ref, to: r.ref, paragraphs: 1 });
       }
-      const meta = (MANIFEST.guidelines as Record<string, { title: string; url: string }>)[partMatch[1]];
+      const meta = GUIDELINE_PARTS[partMatch[1]];
       return { kind: "outline", id, title: meta?.title ?? `Part ${partMatch[1]}`, part: `Part ${partMatch[1]}`, url: meta?.url ?? rows[0].url, sections };
     }
     const direct = await this.get(id);
@@ -191,16 +204,18 @@ export class Corpus {
       const words = query.toLowerCase().match(/[a-z0-9]+(?:\.[0-9]+)?/g)?.filter((w) => w.length > 1) ?? [];
       if (!words.length) return [];
       const run = async (match: string) =>
-        (
-          await this.env.DB.prepare(
-            `SELECT p.*, snippet(passages_fts, 3, '**', '**', ' … ', 24) AS snip
-             FROM passages_fts JOIN passages p ON p.rowid = passages_fts.rowid
-             WHERE passages_fts MATCH ? ${where}
-             ORDER BY bm25(passages_fts, 6.0, 3.0, 2.0, 1.0) LIMIT ?`,
-          )
-            .bind(match, ...binds, pool)
-            .all<PassageRow & { snip: string }>()
-        ).results;
+        snippetRows.parse(
+          (
+            await this.env.DB.prepare(
+              `SELECT p.*, snippet(passages_fts, 3, '**', '**', ' … ', 24) AS snip
+               FROM passages_fts JOIN passages p ON p.rowid = passages_fts.rowid
+               WHERE passages_fts MATCH ? ${where}
+               ORDER BY bm25(passages_fts, 6.0, 3.0, 2.0, 1.0) LIMIT ?`,
+            )
+              .bind(match, ...binds, pool)
+              .all()
+          ).results,
+        );
       const all = await run(ftsQuery(words, "AND"));
       if (all.length >= limit) return all;
       const any = await run(ftsQuery(words, "OR"));
@@ -210,8 +225,7 @@ export class Corpus {
 
     const semantic = async (): Promise<string[] | null> => {
       try {
-        const out = (await this.env.AI.run(EMBEDDING_MODEL as keyof AiModels, { text: [query] } as never)) as { data?: number[][] };
-        const vector = out.data?.[0];
+        const vector = (await embed(this.env.AI, [query]))?.[0];
         if (!vector) return null;
         const filter: VectorizeVectorMetadataFilter = {};
         if (opts.source) filter.source = opts.source;

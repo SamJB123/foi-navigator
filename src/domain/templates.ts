@@ -624,7 +624,8 @@ ${slot(ctx, "decision_maker", "name")}, ${slot(ctx, "designation", "designation"
 export const TEMPLATE_BY_ID = new Map(TEMPLATES.map((t) => [t.id, t]));
 
 export function renderTemplate(id: TemplateId, cf: CaseFile | undefined, tl: Timeline | undefined, details: Record<string, string> = {}) {
-  const t = TEMPLATE_BY_ID.get(id)!;
+  const t = TEMPLATE_BY_ID.get(id);
+  if (!t) throw new Error(`No template "${id}"`);
   const text = t.body({ cf, tl, d: details });
   const unfilled = [...text.matchAll(/\[\[([^\]]+)\]\]/g)].map((m) => m[1]);
   return { template: t, text, unfilled };

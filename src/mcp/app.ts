@@ -2,28 +2,29 @@
  * The MCP App resources, served as ui:// resources that tools point to:
  *
  *   timeline  the deadline timeline (foi_start_request, foi_calculate_deadlines)
- *   document  a card for a draft or report, with copy and download (foi_draft_notice,
- *             foi_estimate_charges, foi_estimate_workload, foi_public_interest_test)
+ *   view      the FOI view for every other tool but fetch: drafts, charges, workload,
+ *             the public interest worksheet, exemptions, the process stepper and
+ *             search results, each with the case file and fixed caveats
  *
- * Both are self-contained (no network), so they declare no CSP domains. The document
- * view asks for clipboard write so "Copy" works; it falls back to selecting the text.
+ * Both are self-contained (no network), so they declare no CSP domains. The FOI view
+ * asks for clipboard write so "Copy" works; it falls back to selecting the text.
  */
 import type { McpServer } from "@modelcontextprotocol/server";
 import { RESOURCE_MIME_TYPE, registerAppResource } from "@modelcontextprotocol/ext-apps/server";
-import documentHtml from "../../dist/document.html";
 import timelineHtml from "../../dist/timeline.html";
+import viewHtml from "../../dist/view.html";
 
 export const TIMELINE_URI = "ui://foi-navigator/timeline.html";
-export const DOCUMENT_URI = "ui://foi-navigator/document.html";
+export const VIEW_URI = "ui://foi-navigator/view.html";
 
 export function registerApp(server: McpServer): void {
   const apps = [
     { name: "FOI deadline timeline", uri: TIMELINE_URI, html: timelineHtml, description: "Interactive view of a request's statutory dates, with event recording.", ui: { prefersBorder: true } },
     {
-      name: "FOI document",
-      uri: DOCUMENT_URI,
-      html: documentHtml,
-      description: "A draft notice or report: key figures, warnings, slots still to fill, and copy or download.",
+      name: "FOI view",
+      uri: VIEW_URI,
+      html: viewHtml,
+      description: "Drafts, calculations, worksheets, exemptions, the process and search results, with the case file and copy or Word export.",
       ui: { prefersBorder: true, permissions: { clipboardWrite: {} } },
     },
   ];

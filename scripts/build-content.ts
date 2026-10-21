@@ -13,7 +13,8 @@
  */
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { parse, type HTMLElement } from "node-html-parser";
+import { HTMLElement, parse } from "node-html-parser";
+import { must } from "../src/guards.ts";
 import { GUIDELINE_PARTS, LEGISLATION } from "./fetch-sources.ts";
 
 const ROOT = join(import.meta.dirname, "..");
@@ -63,11 +64,13 @@ const INDENT: Record<string, string> = {
   SubsectionHead: "",
 };
 
+/** An element's child elements (skipping text and comment nodes). */
+const elementsIn = (n: HTMLElement): HTMLElement[] => n.childNodes.filter((c): c is HTMLElement => c instanceof HTMLElement);
+
 function flatten(root: HTMLElement): HTMLElement[] {
   const out: HTMLElement[] = [];
   (function walk(n: HTMLElement) {
-    for (const c of n.childNodes as HTMLElement[]) {
-      if (!c.tagName) continue;
+    for (const c of elementsIn(n)) {
       if (c.tagName === "P" || c.tagName === "TABLE") out.push(c);
       else walk(c);
     }
@@ -107,10 +110,10 @@ function chunkLines(lines: string[]): string[] {
 async function buildLegislation(key: "act" | "regs") {
   const version = JSON.parse(await readFile(join(SOURCES, key, "version.json"), "utf8"));
   const dir = join(SOURCES, key, "epub", "OEBPS");
-  const docDir = (await readdir(dir)).find((d) => d.startsWith("document_"))!;
-  const file = (await readdir(join(dir, docDir))).find((f) => f.endsWith(".html"))!;
+  const docDir = must((await readdir(dir)).find((d) => d.startsWith("document_")), `document_* folder in ${dir}`);
+  const file = must((await readdir(join(dir, docDir))).find((f) => f.endsWith(".html")), `HTML file in ${docDir}`);
   const root = parse(await readFile(join(dir, docDir, file), "utf8"));
-  const nodes = flatten(root.querySelector("body")!);
+  const nodes = flatten(must(root.querySelector("body"), `<body> in ${file}`));
 
   type Unit = { ref: string; num: string; title: string; trail: string[]; part: string; lines: string[] };
   const units: Unit[] = [];
@@ -207,11 +210,11 @@ const isFootnote = (block: HTMLElement) =>
   !block.classList.contains("gov-is-numbered-paragraph") && /^\[\d+\]/.test(textOf(block));
 
 function listText(list: HTMLElement, depth = 0): string {
-  const items = (list.childNodes as HTMLElement[]).filter((n) => n.tagName === "LI");
+  const items = elementsIn(list).filter((n) => n.tagName === "LI");
   return items
     .map((li, i) => {
-      const nested = (li.childNodes as HTMLElement[]).filter((n) => n.tagName === "UL" || n.tagName === "OL");
-      const own = parse(li.outerHTML).querySelector("li")!;
+      const nested = elementsIn(li).filter((n) => n.tagName === "UL" || n.tagName === "OL");
+      const own = must(parse(li.outerHTML).querySelector("li"), "list item");
       for (const n of own.querySelectorAll("ul,ol")) n.remove();
       const bullet = `${"  ".repeat(depth)}${list.tagName === "OL" ? `${i + 1}.` : "-"} ${textOf(own)}`;
       return [bullet, ...nested.map((n) => listText(n, depth + 1))].join("\n");
@@ -231,7 +234,7 @@ async function buildGuidelines() {
   let ord = 0;
   for (const [part, slug] of Object.entries(GUIDELINE_PARTS)) {
     const root = parse(await readFile(join(SOURCES, "guidelines", `part-${part}.html`), "utf8"));
-    const title = textOf(root.querySelector("h1")!);
+    const title = textOf(must(root.querySelector("h1"), `<h1> in Guidelines Part ${part}`));
     const pageText = root.text.replace(/\s+/g, " ");
     // Pages state their version as a download label ("Part 4 - Charges - v 1.9") or a
     // line ("Version 1.6, May 2024"), and their date as "Updated:" or "Published date:".
@@ -262,7 +265,8 @@ async function buildGuidelines() {
     const headings: string[] = [];
     type Para = { num: string; blocks: string[]; notes: Set<string>; heading: string; title: string };
     const paras: Para[] = [];
-    let currentPara: Para | null = null;
+    // The paragraph that following lists and tables belong to (a holder, so closures narrow it).
+    const open: { para: Para | null } = { para: null };
 
     const noteRefs = (el: HTMLElement, into: Set<string>) => {
       for (const a of el.querySelectorAll('a[href^="#_ftn"]')) {
@@ -272,8 +276,7 @@ async function buildGuidelines() {
     };
 
     const walk = (n: HTMLElement) => {
-      for (const c of n.childNodes as HTMLElement[]) {
-        if (!c.tagName) continue;
+      for (const c of elementsIn(n)) {
         if (c.tagName === "DIV" && /^ftn\d+/.test(c.id)) continue;
         if (c.tagName === "P" && isFootnote(c)) continue;
         const h =/^H([1-6])$/.exec(c.tagName);
@@ -281,15 +284,15 @@ async function buildGuidelines() {
           const level = Number(h[1]);
           headings.length = Math.max(0, level - 2);
           headings[level - 2] = textOf(c);
-          currentPara = null; // a heading closes the paragraph
+          open.para = null; // a heading closes the paragraph
           continue;
         }
         if (c.tagName === "P" && c.classList.contains("gov-is-numbered-paragraph")) {
           // The number is usually the first <span>; a few paragraphs carry it as bare text.
-          const clone = parse(c.outerHTML).querySelector("p")!;
+          const clone = must(parse(c.outerHTML).querySelector("p"), "numbered paragraph");
           const span = clone.querySelector("span");
           let num = span ? textOf(span) : "";
-          if (/^\d+\.\d+[A-Z]?$/.test(num)) span!.remove();
+          if (span && /^\d+\.\d+[A-Z]?$/.test(num)) span.remove();
           else {
             num = /^(\d+\.\d+[A-Z]?)\b/.exec(textOf(c))?.[1] ?? "";
             if (num) clone.set_content(clone.innerHTML.replace(num, ""));
@@ -302,24 +305,25 @@ async function buildGuidelines() {
             if (bold && bold === textOf(c)) {
               headings.length = 5;
               headings[5] = bold;
-              if (currentPara) (currentPara as Para).blocks.push(`**${bold}**`);
-            } else if (currentPara) {
-              noteRefs(c, (currentPara as Para).notes);
-              (currentPara as Para).blocks.push(textOf(c));
+              open.para?.blocks.push(`**${bold}**`);
+            } else if (open.para) {
+              noteRefs(c, open.para.notes);
+              open.para.blocks.push(textOf(c));
             }
             continue;
           }
-          currentPara = {
+          const para: Para = {
             num,
             blocks: [],
             notes: new Set(),
             heading: headings.filter(Boolean).join(" > "),
             title: headings.filter(Boolean).at(-1) ?? title,
           };
-          noteRefs(c, currentPara.notes);
+          noteRefs(c, para.notes);
           for (const sup of clone.querySelectorAll("sup")) sup.replaceWith(`[^${textOf(sup).replace(/\D/g, "")}]`);
-          currentPara.blocks.push(textOf(clone));
-          paras.push(currentPara);
+          para.blocks.push(textOf(clone));
+          paras.push(para);
+          open.para = para;
           continue;
         }
         if (["P", "UL", "OL", "TABLE", "BLOCKQUOTE"].includes(c.tagName)) {
@@ -328,10 +332,10 @@ async function buildGuidelines() {
             walk(c);
             continue;
           }
-          if (currentPara) {
-            noteRefs(c, (currentPara as Para).notes);
+          if (open.para) {
+            noteRefs(c, open.para.notes);
             const t = blockText(c);
-            if (t) (currentPara as Para).blocks.push(t);
+            if (t) open.para.blocks.push(t);
           }
           continue;
         }
@@ -412,7 +416,7 @@ if (import.meta.main) {
     builtAt,
     legislation: Object.fromEntries(
       [act, regs].map(({ version }) => [
-        LEGISLATION.find((l) => l.titleId === version.titleId)!.key,
+        must(LEGISLATION.find((l) => l.titleId === version.titleId), `legislation entry for ${version.titleId}`).key,
         {
           name: version.name,
           titleId: version.titleId,

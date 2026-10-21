@@ -4,7 +4,9 @@
  * mentioned in checklists, pitfalls, templates and worksheets.
  */
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import passages from "../data/content/passages.json";
+import { must } from "../src/guards.ts";
 import { normaliseRef } from "../src/corpus.ts";
 import { EXEMPTIONS } from "../src/domain/exemptions.ts";
 import { GUIDELINES_AGAINST, WEIGHING_STEPS } from "../src/domain/public-interest.ts";
@@ -13,7 +15,7 @@ import { REVIEW_RIGHTS, TEMPLATES, renderTemplate } from "../src/domain/template
 import { estimateWorkload } from "../src/domain/workload.ts";
 import { STEPS } from "../src/domain/workflow.ts";
 
-const ids = new Set((passages as { id: string; parent: string }[]).flatMap((p) => [p.id, p.parent]));
+const ids = new Set(z.array(z.object({ id: z.string(), parent: z.string() })).parse(passages).flatMap((p) => [p.id, p.parent]));
 const has = (id: string) => ids.has(id);
 
 function citations(text: string): string[] {
@@ -72,8 +74,8 @@ describe("templates, worksheets and calculators", () => {
       ...GUIDELINES_AGAINST,
       ...charges.notes,
       ...charges.waiver_considerations,
-      estimateCharges({ documents_contain_applicants_personal_information: true }).barred_by!,
-      estimateCharges({ decision_late: true }).barred_by!,
+      must(estimateCharges({ documents_contain_applicants_personal_information: true }).barred_by, "personal information bar"),
+      must(estimateCharges({ decision_late: true }).barred_by, "late decision bar"),
       ...work.cautions,
       ...work.must_consider,
       ...work.must_not_consider,

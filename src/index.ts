@@ -6,7 +6,7 @@
  *   GET  /healthz          corpus versions
  *   POST /admin/reindex    embed passages into Vectorize (bearer ADMIN_TOKEN; run after a content load)
  */
-import { EMBEDDING_MODEL, type Env, MANIFEST, embeddingText, type PassageRow } from "./corpus.ts";
+import { type Env, MANIFEST, embed, embeddingText, passageRows } from "./corpus.ts";
 import { landingPage } from "./landing.ts";
 import { mcpHandler } from "./mcp/server.ts";
 
@@ -29,18 +29,22 @@ function withCors(res: Response): Response {
   return out;
 }
 
+async function countPassages(env: Env): Promise<number> {
+  const row = await env.DB.prepare("SELECT count(*) AS n FROM passages").first();
+  return typeof row?.n === "number" ? row.n : 0;
+}
+
 async function reindex(request: Request, env: Env): Promise<Response> {
   if (!env.ADMIN_TOKEN || request.headers.get("authorization") !== `Bearer ${env.ADMIN_TOKEN}`) return json({ error: "unauthorised" }, 401);
   const url = new URL(request.url);
   const offset = Number(url.searchParams.get("offset") ?? 0);
   const limit = Math.min(Number(url.searchParams.get("limit") ?? 50), 100);
-  const { results } = await env.DB.prepare("SELECT * FROM passages ORDER BY ord LIMIT ? OFFSET ?").bind(limit, offset).all<PassageRow>();
+  const results = passageRows.parse((await env.DB.prepare("SELECT * FROM passages ORDER BY ord LIMIT ? OFFSET ?").bind(limit, offset).all()).results);
   if (!results.length) return json({ done: true, offset });
-  const out = (await env.AI.run(EMBEDDING_MODEL as keyof AiModels, { text: results.map(embeddingText) } as never)) as unknown as { data: number[][] };
-  await env.VECTORS.upsert(
-    results.map((r, i) => ({ id: r.id, values: out.data[i], metadata: { source: r.source, part: r.part } })),
-  );
-  const { total } = (await env.DB.prepare("SELECT count(*) AS total FROM passages").first<{ total: number }>())!;
+  const vectors = await embed(env.AI, results.map(embeddingText));
+  if (!vectors || vectors.length !== results.length) return json({ error: "embedding failed", offset }, 502);
+  await env.VECTORS.upsert(results.map((r, i) => ({ id: r.id, values: vectors[i], metadata: { source: r.source, part: r.part } })));
+  const total = await countPassages(env);
   return json({ done: offset + results.length >= total, offset, indexed: results.length, next: offset + results.length, total });
 }
 
@@ -58,8 +62,8 @@ export default {
     }
 
     if (url.pathname === "/healthz") {
-      const row = await env.DB.prepare("SELECT count(*) AS n FROM passages").first<{ n: number }>().catch(() => null);
-      return json({ ok: !!row?.n, passages: row?.n ?? 0, builtAt: MANIFEST.builtAt, act: MANIFEST.legislation.act.registerId });
+      const n = await countPassages(env).catch(() => 0);
+      return json({ ok: n > 0, passages: n, builtAt: MANIFEST.builtAt, act: MANIFEST.legislation.act.registerId });
     }
 
     if (url.pathname === "/admin/reindex" && request.method === "POST") return reindex(request, env);

@@ -3,7 +3,7 @@
  * its own in tools-only clients (Copilot Studio, GitHub's agent), and the same facts as
  * structuredContent for clients that read the output schema or render the MCP App.
  */
-import { MANIFEST, type PassageRow, sourceLabel } from "../corpus.ts";
+import { GUIDELINE_PARTS, MANIFEST, type PassageRow, sourceLabel } from "../corpus.ts";
 import { type Timeline, longDate } from "../domain/deadlines.ts";
 import type { Exemption } from "../domain/exemptions.ts";
 import type { Step } from "../domain/workflow.ts";
@@ -13,11 +13,10 @@ export const DISCLAIMER =
 
 export function sourcesLine(parts: string[] = []): string {
   const act = MANIFEST.legislation.act;
-  const gl = MANIFEST.guidelines as Record<string, { version: string; updated: string }>;
   const glText = parts.length
     ? parts
-        .filter((p) => gl[p])
-        .map((p) => `Part ${p} v${gl[p].version}`)
+        .filter((p) => GUIDELINE_PARTS[p])
+        .map((p) => `Part ${p} v${GUIDELINE_PARTS[p].version}`)
         .join(", ")
     : "Parts 1–15";
   return `_Sources: FOI Act 1982 (${act.registerId}, in force ${act.inForceFrom}); OAIC FOI Guidelines (${glText}). ${DISCLAIMER}_`;
