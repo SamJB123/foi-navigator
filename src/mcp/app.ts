@@ -14,8 +14,16 @@ import { RESOURCE_MIME_TYPE, registerAppResource } from "@modelcontextprotocol/e
 import timelineHtml from "../../dist/timeline.html";
 import viewHtml from "../../dist/view.html";
 
-export const TIMELINE_URI = "ui://foi-navigator/timeline.html";
-export const VIEW_URI = "ui://foi-navigator/view.html";
+/** FNV-1a, for a short content version: hosts cache ui:// resources by URI. */
+function contentVersion(s: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193) >>> 0;
+  return h.toString(36);
+}
+
+// Each build gets new URIs, so a host can never pair a cached older widget with newer data.
+export const TIMELINE_URI = `ui://foi-navigator/timeline-${contentVersion(timelineHtml)}.html`;
+export const VIEW_URI = `ui://foi-navigator/view-${contentVersion(viewHtml)}.html`;
 
 export function registerApp(server: McpServer): void {
   const apps = [

@@ -5,6 +5,7 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+import { TIMELINE_URI, VIEW_URI } from "../src/mcp/app.ts";
 import { viewSchema } from "../src/mcp/view-schema.ts";
 import worker from "../src/index.ts";
 
@@ -91,8 +92,9 @@ describe("discovery", () => {
       expect(t.title, t.name).toBeTruthy();
     }
     const withUi = (uri: string) => tools.filter((t) => JSON.stringify(t._meta ?? {}).includes(uri)).map((t) => t.name).sort();
-    expect(withUi("ui://foi-navigator/timeline.html")).toEqual(["foi_calculate_deadlines", "foi_start_request"]);
-    expect(withUi("ui://foi-navigator/view.html")).toEqual([
+    expect(TIMELINE_URI).toMatch(/^ui:\/\/foi-navigator\/timeline-[0-9a-z]+\.html$/);
+    expect(withUi(TIMELINE_URI)).toEqual(["foi_calculate_deadlines", "foi_start_request"]);
+    expect(withUi(VIEW_URI)).toEqual([
       "foi_draft_notice",
       "foi_estimate_charges",
       "foi_estimate_workload",
@@ -161,12 +163,12 @@ describe("discovery", () => {
     expect(prompts).toEqual(expect.arrayContaining(["triage_new_request", "assess_exemption", "respond_as_line_area", "draft_statement_of_reasons"]));
     const resources = (await legacy("resources/list")).result.resources.map((r: { uri: string }) => r.uri);
     expect(resources).toEqual(
-      expect.arrayContaining(["foi://guide", "foi://process-map", "foi://sources", "ui://foi-navigator/timeline.html", "ui://foi-navigator/view.html", "foi://act/47F", "foi://exemptions/47C"]),
+      expect.arrayContaining(["foi://guide", "foi://process-map", "foi://sources", TIMELINE_URI, VIEW_URI, "foi://act/47F", "foi://exemptions/47C"]),
     );
   });
 
   it("serves the MCP Apps as self-contained HTML resources", async () => {
-    for (const uri of ["ui://foi-navigator/timeline.html", "ui://foi-navigator/view.html"]) {
+    for (const uri of [TIMELINE_URI, VIEW_URI]) {
       const { result } = await legacy("resources/read", { uri });
       const c = result.contents[0];
       expect(c.mimeType, uri).toBe("text/html;profile=mcp-app");

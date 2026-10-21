@@ -53,10 +53,10 @@ const PRESENT = {
   draft: `${IF_NO_VIEW}show the draft in full and word for word, with its [[slots]]. Either way, offer to fill the slots by calling foi_draft_notice again with details.`,
   charges: `${IF_NO_VIEW}show any bar on charging first, then the total, deposit and itemised table as given.`,
   workload: `${IF_NO_VIEW}show the estimate, the activity table and the draft evidence statement as given.`,
-  publicInterest: `${IF_NO_VIEW}show the 'Your factors' table and the s 11B(4) factors as given.`,
+  publicInterest: `${IF_NO_VIEW}show the 'Your factors' table and the s 11B(4) factors as given. Either way, whether any factor falls within s 11B(4), and the weight of the rest, are for the decision-maker: you may point to the provisions and ask, but don't decide it.`,
   step: `${IF_NO_VIEW}give the step's checklist as a checklist, with anything under 'For this request' first.`,
-  exemption: `${IF_NO_VIEW}take the user through the elements as a numbered list, then the carve-outs and common errors.`,
-  exemptionList: `${IF_NO_VIEW}show the table of exemptions as given.`,
+  exemption: `${IF_NO_VIEW}take the user through the elements as a numbered list, then the carve-outs and common errors. Either way, whether each element is met is the decision-maker's finding on the evidence.`,
+  exemptionList: `${IF_NO_VIEW}show the table of exemptions as given. These are exemptions often considered for that kind of information, not ones found to apply.`,
   map: `${IF_NO_VIEW}show the stages and steps as a list.`,
   questions: "Ask the user these questions directly, then call foi_start_request again with the answers.",
 };
@@ -289,7 +289,7 @@ export function registerTools(server: McpServer, env: Env): void {
       return result(
         md,
         { validity, issues, actions, case_file: cf, timeline: tl },
-        `Start with the s 15(2) result on the facts given, and any issues. ${PRESENT.dates}`,
+        `Relay the s 15(2) result as "on the facts given", not as a finding that the request is valid, with any issues. ${PRESENT.dates}`,
       );
     },
   );

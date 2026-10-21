@@ -44,8 +44,11 @@ function check(ok: unknown, label: string) {
 
 for (const era of ["legacy", "modern"] as const) {
   console.log(`\n== ${era}`);
-  const tools = z.array(z.object({ name: z.string() })).parse((await rpc("tools/list", {}, era)).tools);
+  const tools = z
+    .array(z.object({ name: z.string(), _meta: z.object({ ui: z.object({ resourceUri: z.string() }).optional() }).optional() }))
+    .parse((await rpc("tools/list", {}, era)).tools);
   check(tools.length === 11, `tools/list: ${tools.map((t) => t.name).join(", ")}`);
+  const uris = [...new Set(tools.flatMap((t) => t._meta?.ui?.resourceUri ?? []))];
   const ch = await rpc("tools/call", { name: "foi_estimate_charges", arguments: { search_hours: 6, decision_hours: 12 } }, era);
   check(ch.structuredContent?.total === 230 && ch.structuredContent?.deposit_maximum === 57.5, "foi_estimate_charges → $230, deposit $57.50");
   const wl = await rpc(
@@ -79,8 +82,11 @@ for (const era of ["legacy", "modern"] as const) {
   check(draft.structuredContent?.text?.includes("21 Dec 2026"), "foi_draft_notice uses the case file's due date");
   const f = await rpc("tools/call", { name: "fetch", arguments: { id: "s 15AA" } }, era);
   check(f.structuredContent?.text?.includes("30 days"), "fetch s 15AA");
-  const ui = await rpc("resources/read", { uri: "ui://foi-navigator/timeline.html" }, era);
-  check(ui.contents?.[0]?.mimeType === "text/html;profile=mcp-app", "MCP App resource");
+  for (const uri of uris) {
+    const ui = await rpc("resources/read", { uri }, era);
+    check(ui.contents?.[0]?.mimeType === "text/html;profile=mcp-app", `MCP App resource ${uri}`);
+  }
+  check(uris.length === 2, "two MCP App resources");
 }
 
 console.log("\n== search (hybrid)");

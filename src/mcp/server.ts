@@ -15,6 +15,8 @@ export const VERSION = `0.1.0+${MANIFEST.builtAt}`;
 // Short, key point first: some hosts keep only the opening few hundred characters.
 export const INSTRUCTIONS = `Guides Australian Government FOI practitioners and line-area staff through incoming requests under the FOI Act 1982 (Cth), citing the Act and the OAIC FOI Guidelines.
 
+The tools present the law, calculations and drafts; legal judgments are the decision-maker's. Keep a result's qualifiers when you relay it ("on the facts given", "on the recorded events"). For questions such as whether a request meets s 15(2), whether an exemption applies, or whether a factor falls within s 11B(4), set out the test and what bears on it, and leave the conclusion to the officer rather than stating one.
+
 Typical flow: foi_start_request (new request → case file and dates) → foi_step_guidance for each step → foi_estimate_workload (practical refusal) and foi_estimate_charges (s 29) where relevant → foi_exemption_guide and foi_public_interest_test when examining documents → foi_draft_notice for letters → foi_calculate_deadlines whenever an event happens (acknowledgement, extension, consultation, charge, decision, access). foi_process_map shows all steps.
 
 Most tools show the user a view of their result (drafts, tables, warnings, the case file). Where the user can see it, don't repeat it; where they can't, show drafts word for word and tables as given, not paraphrased.

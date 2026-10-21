@@ -8,10 +8,10 @@
  */
 
 export const STATUTORY_FOR = [
-  { id: "s11B(3)(a)", text: "promote the objects of the FOI Act (including all the matters in ss 3 and 3A)" },
-  { id: "s11B(3)(b)", text: "inform debate on a matter of public importance" },
-  { id: "s11B(3)(c)", text: "promote effective oversight of public expenditure" },
-  { id: "s11B(3)(d)", text: "allow a person to access their own personal information" },
+  { id: "s 11B(3)(a)", text: "promote the objects of the FOI Act (including all the matters in ss 3 and 3A)" },
+  { id: "s 11B(3)(b)", text: "inform debate on a matter of public importance" },
+  { id: "s 11B(3)(c)", text: "promote effective oversight of public expenditure" },
+  { id: "s 11B(3)(d)", text: "allow a person to access their own personal information" },
 ];
 
 /** Short labels for the Guidelines' non-exhaustive lists; full text is in [6.231] and [6.233]. */

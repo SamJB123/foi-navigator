@@ -496,7 +496,9 @@ app.ontoolresult = (params) => {
   if (isRecord(sc) && isRecord(sc.case_file)) lastCaseFile = sc.case_file;
   const parsed = viewSchema.safeParse(isRecord(sc) ? sc.view : undefined);
   if (!parsed.success) {
-    root.innerHTML = `<p class="muted">This result has no view; the answer is in the chat.</p>`;
+    // Show the result's own text rather than nothing (e.g. a cached widget older than the server).
+    const text = params.content?.find((c) => c.type === "text");
+    root.innerHTML = text && text.type === "text" ? `<article class="doc">${mdToHtml(text.text)}</article>` : `<p class="muted">The result is in the chat.</p>`;
     return;
   }
   history.length = 0;
