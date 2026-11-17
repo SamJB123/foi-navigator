@@ -42,7 +42,7 @@ Guided support for Australian Government FOI practitioners handling **incoming r
 | search / fetch | Find and read the Act and Guidelines |
 
 ## Coverage
-All five stages: intake and deadlines; scope, charges and practical refusal; searches and third-party consultation; exemptions and the public interest test; decision, release, disclosure log and review.
+All six stages: intake and deadlines; scope, charges and practical refusal; searches; consultation and assessment (internal stakeholders, third parties, risks and sensitivities); exemptions and the public interest test; decision, release, disclosure log and review.
 
 ## Limits
 Calendar days; weekends roll to the next business day, but public holidays are not checked. ${DISCLAIMER}

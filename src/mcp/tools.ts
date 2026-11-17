@@ -106,7 +106,7 @@ export function registerTools(server: McpServer, env: Env): void {
         "Use it to orient a practitioner or line-area officer, then open any step with foi_step_guidance. Pass the case file to show where the request is up to.",
       inputSchema: z.object({
         role,
-        stage: z.enum(["intake", "scope", "search", "exemptions", "decision"]).optional().describe("Only this stage"),
+        stage: z.enum(["intake", "scope", "search", "consult", "exemptions", "decision"]).optional().describe("Only this stage"),
         case_file: caseFile.optional().describe("Marks the current and completed steps"),
       }),
       outputSchema: z.looseObject({ stages: z.array(z.looseObject({})) }),
@@ -122,7 +122,7 @@ export function registerTools(server: McpServer, env: Env): void {
       }));
       const lines = ["# Handling an incoming FOI request (Commonwealth)", ""];
       if (role === "line_area")
-        lines.push("_For line-area staff: you will mostly be asked to search for documents and to explain any genuine harm from release. The FOI team and an authorised decision-maker decide._", "");
+        lines.push("_For line-area staff: you will mostly be asked to search for documents and to explain any genuine harm from release. The FOI team advises, and an authorised decision-maker decides._", "");
       for (const s of stages) {
         lines.push(`### ${s.title}${s.status === "planned" ? " — planned (reference only)" : ""}`, s.summary);
         for (const st of s.steps) lines.push(`- \`${st.id}\` ${st.title}${st.status === "planned" ? " _(planned)_" : ""} — ${st.purpose}`);
@@ -326,7 +326,7 @@ export function registerTools(server: McpServer, env: Env): void {
     {
       title: "Guidance for an FOI step",
       description:
-        "The checklist, common errors, templates and key provisions for one step of the FOI process (ids from foi_process_map, e.g. intake.validity, exemptions.public_interest, decision.statement_of_reasons), " +
+        "The checklist, common errors, templates and key provisions for one step of the FOI process (ids from foi_process_map, e.g. intake.validity, consult.internal, exemptions.public_interest, decision.statement_of_reasons), " +
         "with the relevant passages of the Act and Guidelines quoted. Pass the case file to tailor it to the request; role line_area gives plain-English guidance for business-area staff.",
       inputSchema: z.object({
         step: z.enum(STEP_IDS).describe("Step id from foi_process_map"),

@@ -181,7 +181,7 @@ section > .wrap { display: grid; gap: 26px; }
 .dates-list .d { font-variant-numeric: tabular-nums; font-weight: 700; }
 
 /* Process map */
-.stages { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; padding: 18px; }
+.stages { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; padding: 18px; }
 @media (max-width: 900px) { .stages { grid-template-columns: 1fr; } }
 .stage { display: grid; gap: 8px; align-content: start; }
 .stage-title { font: 700 0.95rem var(--font-display); padding-bottom: 6px; border-bottom: 2px solid var(--registry); display: flex; gap: 8px; align-items: baseline; }
@@ -448,7 +448,7 @@ footer .wrap { display: grid; gap: 8px; max-width: 820px; }
     <div class="tools">
       <div class="tool"><code>foi_start_request</code><p>Checks validity against s 15(2), flags transfer and personal-information issues, and creates the case file with acknowledgement and decision dates.</p></div>
       <div class="tool"><code>foi_calculate_deadlines</code><p>Recalculates every statutory date after extensions, clock-stops, decisions and access, including review windows and the disclosure log.</p></div>
-      <div class="tool"><code>foi_process_map</code><p>Shows all 24 steps across the five stages, for officers or line areas.</p></div>
+      <div class="tool"><code>foi_process_map</code><p>Shows all 26 steps across the six stages, for officers or line areas.</p></div>
       <div class="tool"><code>foi_step_guidance</code><p>The checklist, common errors and quoted law for one step, tailored to your case file.</p></div>
     </div>
     <div class="group-label">Doing the analysis</div>
@@ -597,7 +597,7 @@ footer .wrap { display: grid; gap: 8px; max-width: 820px; }
           stage: "1 · You ask", explain: "Line-area staff can use the connector too, with guidance written for them.", code: null },
         { chat: { who: "tool", text: "Using <code>foi_step_guidance</code>" },
           stage: "2 · Line-area guidance", explain: "The assistant requests the line-area version of the step.",
-          code: '{ "tool": "foi_step_guidance",\n  "arguments": {\n    "step": "exemptions.line_area_views",\n    "role": "line_area" } }\n\n→ Your views are evidence for the\n  decision-maker. Be specific: page,\n  paragraph, the harm, who it affects,\n  how likely it is.\n→ Not to be taken into account (s 11B(4)):\n  embarrassment to the Government,\n  misunderstanding, seniority, confusion\n  or unnecessary debate.' },
+          code: '{ "tool": "foi_step_guidance",\n  "arguments": {\n    "step": "consult.internal",\n    "role": "line_area" } }\n\n→ Your views are evidence for the\n  decision-maker. Be specific: page,\n  paragraph, the harm, who it affects,\n  how likely it is.\n→ Not to be taken into account (s 11B(4)):\n  embarrassment to the Government,\n  misunderstanding, seniority, confusion\n  or unnecessary debate.' },
         { chat: { who: "ai", text: "Two jobs: <strong>search</strong> everywhere you keep records on the subject, including email, Teams and work phones, and write down what you searched. Then, for anything sensitive, give the <strong>specific harm</strong>, who it affects and how likely it is. I can help you fill in the response template as you go." },
           stage: "3 · Plain-English help", explain: "The FOI team gets better evidence back, in a consistent format, because the line area was guided through it.", code: null },
       ],
@@ -755,23 +755,27 @@ footer .wrap { display: grid; gap: 8px; max-width: 820px; }
       ["Decide on charges", "Check the bars (applicant's personal information, a late decision), then calculate and notify under s 29(1).", ["foi_estimate_charges"], ["s29_charges_notice"], false],
       ["Charges contention", "Weigh hardship and the s 29(5)(b) public interest, and decide within 30 days or the estimate stands.", ["foi_estimate_charges"], ["charges_contention_decision"], false],
     ]},
-    { n: "3", title: "Searches and consultation", steps: [
+    { n: "3", title: "Searches", steps: [
       ["Plan and conduct searches", "Every likely location, including messaging apps and work phones, searched by the people who hold the records, and recorded.", ["foi_step_guidance"], ["search_minute", "line_area_tasking"], true],
       ["Not found, or produce (s 24A, s 17)", "Show all reasonable steps were taken; produce a document from a database where s 17 requires.", ["search", "fetch"], ["search_minute"], false],
-      ["Consult third parties", "Decide if consultation under ss 26A, 27 or 27A is needed, extend time under s 15(6), and ask neutral questions.", ["foi_calculate_deadlines"], ["third_party_consultation", "extension_s15_6_notice"], false],
-      ["Submissions and release timing", "Weigh submissions, notify objectors, and don't release until their review window runs out.", ["foi_calculate_deadlines"], ["third_party_decision_notice"], false],
     ]},
-    { n: "4", title: "Exemptions", steps: [
-      ["Schedule the documents", "Number every document with a neutral description and a proposed decision.", ["foi_draft_notice"], ["document_schedule"], false],
-      ["Line-area views", "Evidence of real harm, document by document. Not embarrassment or seniority.", ["foi_step_guidance"], ["line_area_sensitivity_response"], true],
+    { n: "4", title: "Consultation and assessment", steps: [
+      ["Schedule and proposed redactions", "Number every document with a neutral description, and mark up a first proposal for internal stakeholders to react to.", ["foi_draft_notice"], ["document_schedule"], false],
+      ["Consult internal stakeholders", "The line area says what should and shouldn't be released, and why. Real harm, not embarrassment or seniority; no need to name an exemption.", ["foi_step_guidance"], ["line_area_tasking", "line_area_sensitivity_response"], true],
+      ["Consult third parties", "After internal views, recommend consultation under ss 26A, 27 or 27A to the decision-maker, extend time under s 15(6), and ask neutral questions.", ["foi_calculate_deadlines"], ["third_party_consultation", "extension_s15_6_notice"], false],
+      ["Consider submissions", "Weigh what third parties say and record why. An objection is not a veto.", ["foi_exemption_guide"], [], false],
+      ["Risks and sensitivities", "Build on the first pass from intake and settle a release position, document by document, for the exemptions stage to test.", ["foi_step_guidance"], ["document_schedule"], false],
+    ]},
+    { n: "5", title: "Exemptions and proposed decision", steps: [
       ["Exemptions (Div 2)", "Findings on each element of ss 33–47A, with carve-outs such as waiver of privilege.", ["foi_exemption_guide"], [], false],
       ["Conditional exemptions (Div 3)", "Establish the criteria of ss 47B–47J first, then the public interest test.", ["foi_exemption_guide"], [], false],
       ["Public interest test", "Weigh the factors for and against, without taking the s 11B(4) irrelevant factors into account, and explain the weight.", ["foi_public_interest_test"], [], false],
       ["Edited copies and access form", "s 22 deletions with reasons, s 21 deferral, s 20 forms of access.", ["foi_step_guidance"], ["document_schedule"], false],
     ]},
-    { n: "5", title: "Decision, release, review", steps: [
+    { n: "6", title: "Decision, release, review", steps: [
       ["Confirm the decision-maker", "A current s 23 authorisation. The reasoning must be the decision-maker's own.", ["foi_step_guidance"], [], false],
       ["Statement of reasons", "Findings, evidence, reasons, public interest weight, and the mandatory review rights.", ["foi_draft_notice"], ["statement_of_reasons"], false],
+      ["Access grant decision", "Releasing over a third party's objection: notify them and the applicant, and hold that document until the review window runs out.", ["foi_calculate_deadlines"], ["third_party_decision_notice"], false],
       ["Notify and give access", "On time, after charges and third-party windows, by secure delivery.", ["foi_calculate_deadlines"], [], false],
       ["Disclosure log", "Publish within 10 working days of access, unless an exception applies.", ["foi_calculate_deadlines"], ["disclosure_log_entry"], false],
       ["Reviews", "Internal review within 30 days by a different officer; IC review windows.", ["foi_calculate_deadlines"], ["internal_review_decision"], false],

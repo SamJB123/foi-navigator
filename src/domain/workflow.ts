@@ -1,5 +1,5 @@
 /**
- * The process map: five stages of an incoming Commonwealth FOI request, each a list
+ * The process map: six stages of an incoming Commonwealth FOI request, each a list
  * of steps with a checklist, pitfalls and the provisions to read.
  *
  * Every citation here is tested to exist in the bundled corpus by test/content.test.ts:
@@ -14,7 +14,7 @@
 import { FRANKNESS_GUIDANCE } from "./public-interest.ts";
 
 export type Role = "officer" | "line_area";
-export type StageId = "intake" | "scope" | "search" | "exemptions" | "decision";
+export type StageId = "intake" | "scope" | "search" | "consult" | "exemptions" | "decision";
 
 export type ChecklistItem = { text: string; roles?: Role[] };
 
@@ -54,21 +54,29 @@ export const STAGES: Stage[] = [
   },
   {
     id: "search",
-    title: "3. Searches and third-party consultation",
+    title: "3. Searches",
     status: "ready",
-    summary: "Reasonable, documented searches; s 24A and s 17; third-party consultation under ss 26A, 27, 27A with the s 15(6) extension, and release timing.",
+    summary: "Reasonable, documented searches by the people who hold the records; documents that cannot be found or do not exist (s 24A); producing a document from electronic information (s 17).",
+  },
+  {
+    id: "consult",
+    title: "4. Consultation and assessment",
+    status: "ready",
+    summary:
+      "Schedule the documents with proposed redactions, consult internal stakeholders, recommend and carry out third-party consultation (ss 26A, 27, 27A with the s 15(6) extension), then settle the risks, sensitivities and release position.",
   },
   {
     id: "exemptions",
-    title: "4. Examine documents and apply exemptions",
+    title: "5. Exemptions and proposed decision",
     status: "ready",
-    summary: "Schedule the documents, gather line-area evidence of harm, apply exemptions and the public interest test, and decide how to give access.",
+    summary: "Test the release position against the exemptions and the public interest test, decide how access would be given, and draft proposed positions for the decision-maker.",
   },
   {
     id: "decision",
-    title: "5. Decision, release and review",
+    title: "6. Decision, release and review",
     status: "ready",
-    summary: "The authorised decision-maker, the s 26 statement of reasons, release after third-party review windows, the disclosure log, and review rights.",
+    summary:
+      "The authorised decision-maker, the s 26 statement of reasons, access grant decisions where a third party objects, release after review windows, the disclosure log, and review rights.",
   },
 ];
 
@@ -183,12 +191,15 @@ export const STEPS: Step[] = [
       { text: "Charges: are they appropriate and permitted? Not for own personal information (Charges Regs s 7(1)), and not if the decision will be late (s 7(2)). Charges are discretionary ([4.19]–[4.21])." },
       { text: "Neither confirm nor deny: does s 25 apply (ss 33, 37(1), 45A)? If so, no search is needed for that decision ([3.181]–[3.191])." },
       { text: "Third parties: whose business (s 27), personal (s 27A), State (s 26A) or foreign government information is likely to be in scope? Consultation can support a +30-day extension, determined in writing (s 15(6))." },
-      { text: "Line areas: identify the business areas that hold documents; send a tasking with the scope, what to search, and the date to return documents and views on sensitivities (template: line_area_tasking)." },
-      { text: "Diarise interim dates working back from the due date: searches back, consultation letters out, draft decision to the decision-maker." },
-      { text: "Line area: you are asked to find documents and to explain any genuine harm from release. The FOI team and an authorised decision-maker decide what is released.", roles: ["line_area"] },
+      { text: "Line areas: identify the business areas that hold documents; send a tasking with the scope, what to search, and the date to return documents (template: line_area_tasking)." },
+      {
+        text: "Risks and sensitivities, first pass: note the obvious ones from the request itself — the subject matter, and whether Cabinet, legal, personal or commercial material is likely — so internal stakeholders can build on the list once the documents are reviewed (stage 4, step consult.risks). A sensitivity is a prompt to look for a real harm; it is not itself a ground to withhold.",
+      },
+      { text: "Diarise interim dates working back from the due date: searches back, schedule and proposed redactions out to the line area, internal views back, any third-party letters out, proposed decision to the decision-maker." },
+      { text: "Line area: you are asked to find documents and to explain any genuine harm from release. The FOI team advises, and an authorised decision-maker decides what is released.", roles: ["line_area"] },
     ],
     pitfalls: [
-      "Leaving third-party consultation until the end, when the s 15(6) extension may no longer be useful.",
+      "Leaving so little time for internal consultation that any third-party consultation comes at the end, when the s 15(6) extension may no longer be useful.",
       "Asking line areas for 'any concerns' without telling them which concerns the public interest test must not take into account (embarrassment to the Government, misunderstanding, seniority, confusion or unnecessary debate — s 11B(4)).",
     ],
     line_area: [
@@ -199,7 +210,7 @@ export const STEPS: Step[] = [
     templates: ["line_area_tasking"],
     tools: ["foi_process_map", "foi_draft_notice"],
     read: ["act:s24AA", "act:s25", "gl:3.181", "gl:4.19", "regs:s7", "act:s15"],
-    next: ["scope.practical_refusal", "scope.charges", "search.searches", "search.consultation", "exemptions.schedule"],
+    next: ["scope.practical_refusal", "scope.charges", "search.searches", "consult.schedule"],
   },
 
   // -------------------------------------------------------------------------
@@ -330,7 +341,7 @@ export const STEPS: Step[] = [
   },
 
   // -------------------------------------------------------------------------
-  // Stage 3 — Searches and consultation
+  // Stage 3 — Searches
   // -------------------------------------------------------------------------
   {
     id: "search.searches",
@@ -350,12 +361,17 @@ export const STEPS: Step[] = [
       { text: "Have the business areas most likely to hold documents search, not only the FOI team; consult officers who know about the documents and record their advice ([3.152]–[3.153]). Template: line_area_tasking." },
       { text: "Keep a search record: who searched, where, the terms and parameters, dates, time taken, results, and whether backups were examined ([3.148], [3.160]). Template: search_minute." },
       { text: "If initial searches find nothing but records show the work was done, search further ([3.145])." },
+      {
+        text: "Check what has already been released, and record it against each document: the agency's disclosure log and earlier FOI decisions, its website and published reports, material tabled in Parliament or given to committees, media releases, and releases by other agencies ([3.82]). Where content is already in the public domain, disclosure is unlikely to cause damage ([5.26]); a leak or accidental release is treated differently from an official one ([5.27]).",
+      },
       { text: "Information held in a database rather than documents: consider s 17 (step search.not_found)." },
       { text: "Line area: search every place you keep work records on the subject — email (including archives and shared mailboxes), Teams and chat, shared drives, the records system, notebooks, and work phones or messaging apps.", roles: ["line_area"] },
       { text: "Line area: record what you searched, the terms and date range, when, how long it took, and what you found. Include drafts and attachments unless the FOI team says they are excluded.", roles: ["line_area"] },
       { text: "Line area: tell the FOI team about anything relevant you know exists but can't find, or that was destroyed under a records authority.", roles: ["line_area"] },
+      { text: "Line area: say which documents, or what information in them, you know to be public already — published, tabled, announced or released before — and where.", roles: ["line_area"] },
     ],
     pitfalls: [
+      "Finding out only after the line area objects to release that the same information is already public.",
       "The FOI team searching alone, without the business areas that hold the records ([3.152]).",
       "No record of searches — leaving the agency unable to show 'all reasonable steps' on review.",
       "Ignoring messaging apps and personal devices used for work ([3.158]–[3.159]).",
@@ -364,11 +380,12 @@ export const STEPS: Step[] = [
       "Search everywhere you keep work records on the subject — not just the official system: email and archives, Teams, shared drives, notebooks, work phones and messaging apps.",
       "Write down where you looked, the search terms, the date range, how long it took and what you found. The FOI team needs this to show the search was reasonable.",
       "Send everything within scope, including drafts and attachments, unless the FOI team tells you an exclusion has been agreed.",
+      "Tell the FOI team what is already public — published, tabled, announced or released before — and where to find it. It saves everyone arguing later about material that is already out there.",
     ],
     templates: ["line_area_tasking", "search_minute"],
     tools: ["foi_draft_notice", "foi_calculate_deadlines"],
-    read: ["gl:3.144", "gl:3.145", "gl:3.150", "gl:3.151", "gl:3.152", "gl:3.154", "gl:3.156", "gl:3.158", "gl:3.160"],
-    next: ["search.not_found", "search.consultation", "exemptions.schedule"],
+    read: ["gl:3.144", "gl:3.145", "gl:3.150", "gl:3.151", "gl:3.152", "gl:3.154", "gl:3.156", "gl:3.158", "gl:3.160", "gl:5.26", "gl:5.27"],
+    next: ["search.not_found", "consult.schedule"],
   },
   {
     id: "search.not_found",
@@ -395,19 +412,88 @@ export const STEPS: Step[] = [
     ],
     templates: ["search_minute", "statement_of_reasons"],
     read: ["act:s24A", "act:s17", "gl:3.142", "gl:3.143", "gl:3.147", "gl:3.148", "gl:3.149", "gl:3.235", "gl:3.237", "gl:3.238", "gl:3.241"],
-    next: ["search.consultation", "exemptions.schedule", "decision.statement_of_reasons"],
+    next: ["consult.schedule", "decision.statement_of_reasons"],
   },
+
+  // -------------------------------------------------------------------------
+  // Stage 4 — Consultation and assessment
+  // -------------------------------------------------------------------------
   {
-    id: "search.consultation",
-    stage: "search",
-    title: "Identify and consult third parties (ss 26A, 27, 27A, 15(7))",
+    id: "consult.schedule",
+    stage: "consult",
+    title: "Schedule the documents and mark up proposed redactions",
     status: "ready",
     roles: ["officer"],
-    purpose: "Give a State, business or person a reasonable opportunity to contend an exemption applies, where they might reasonably wish to — early, and with the 30-day extension.",
+    purpose: "List every document in scope and mark up a first proposal for each, so internal stakeholders have something specific to react to and the statement of reasons can identify the documents.",
+    checklist: [
+      { text: "Number each document; give date, type, author/recipient role (not names of private individuals), page count and a neutral description that does not reveal exempt matter ([3.288])." },
+      { text: "Mark duplicates and anything outside scope; irrelevant material may be deleted under s 22, but explain it ([3.162]–[3.176])." },
+      { text: "For each document record a proposed treatment: release in full, release in part (s 22), or refuse — and the provisions you have in mind. It is a proposal for consultation, not a decision." },
+      { text: "Mark up the proposed redactions on a copy of the documents, so the line area can agree or disagree with something specific." },
+      { text: "Carry over the first-pass risks and sensitivities noted at intake (step intake.plan) and note which documents they touch." },
+      { text: "Show on the schedule which documents, or what information in them, the searches found to be already public, and where (step search.searches), so the line area sees it before giving views." },
+      { text: "Note which documents contain a third party's information (a State, a business, a person, a foreign government). Whether to consult them is considered after internal views (step consult.third_parties)." },
+    ],
+    pitfalls: [
+      "Descriptions in the schedule that themselves reveal exempt information (s 26(2), [3.286]).",
+      "Presenting the proposed redactions as settled, so internal stakeholders do not test them.",
+    ],
+    templates: ["document_schedule"],
+    tools: ["foi_draft_notice", "foi_exemption_guide"],
+    read: ["gl:3.288", "gl:3.162", "act:s22"],
+    next: ["consult.internal"],
+  },
+  {
+    id: "consult.internal",
+    stage: "consult",
+    title: "Consult internal stakeholders",
+    status: "ready",
+    roles: ["officer", "line_area"],
+    purpose: "Get the views of the people who know the subject on what should and should not be released, and why, in a form the decision-maker can test and use.",
+    checklist: [
+      { text: "Send the line area the schedule, the documents and the proposed redactions, with a return date worked back from the due date (template: line_area_tasking)." },
+      { text: "Ask what they think should and should not be released, and why. Do not ask the line area which exemptions apply: they describe the harm, and the FOI team works out which provision, if any, it fits." },
+      { text: "Ask for the harm, its likelihood, and the evidence: 'would or could reasonably be expected to' means at least a real, significant or material possibility, not a mere risk or possibility ([5.15]–[5.18])." },
+      { text: "Decide case by case who else should see particular documents — for example the area responsible for Cabinet records where a document may be a Cabinet document (s 34), or legal where privilege may be claimed (s 42). Not every request needs this." },
+      { text: "Other Commonwealth agencies: consulting them is good practice where they created or have an interest in a document, but it does not extend time ([3.82]–[3.83])." },
+      { text: "Line area: for each sensitive passage, say what would happen if it were released, to whom, and why that is likely. Point to facts — a live negotiation, an open investigation, a person's safety.", roles: ["line_area"] },
+      {
+        text: "Line area: do not rely on embarrassment to the Government, the risk of being misunderstood, the author's seniority, or confusion or unnecessary debate: s 11B(4) says these must not be taken into account in the public interest test.",
+        roles: ["line_area"],
+      },
+      { text: "Line area: say if information is already public, or would be harmless with time passed. Release must be considered where harm is not shown.", roles: ["line_area"] },
+      { text: "The decision is made by the officer authorised under s 23 — in many agencies a senior executive in the line area. Views gathered here are evidence for that decision, not a direction. Record how each was considered." },
+    ],
+    pitfalls: [
+      "Blanket claims ('the whole document is sensitive') with no specific harm.",
+      "Asking the line area which exemption applies, instead of what harm release would cause.",
+      "Treating the line area's preference as the decision; the authorised decision-maker decides (s 23).",
+    ],
+    line_area: [
+      "You'll get the schedule, the documents and the FOI team's proposed redactions. Say where you agree and disagree, and why. You don't need to name an exemption.",
+      "Your views are evidence for the decision-maker. Be specific: page, paragraph, the harm, who it affects, and how likely it is.",
+      "Legitimate harms include: prejudicing an investigation, revealing privileged legal advice, unreasonably disclosing someone's personal information, damaging a business's commercial position, or a substantial adverse effect on agency operations.",
+      "Not legitimate (s 11B(4)): embarrassment or loss of confidence in the Government, that the document could be misunderstood, that its author is senior, or that it could cause confusion or debate.",
+    ],
+    templates: ["line_area_tasking", "line_area_sensitivity_response"],
+    tools: ["foi_exemption_guide", "foi_public_interest_test", "foi_draft_notice"],
+    read: ["gl:5.15", "gl:5.19", "act:s11B", "gl:6.235", "gl:3.82"],
+    next: ["consult.third_parties", "consult.risks"],
+  },
+  {
+    id: "consult.third_parties",
+    stage: "consult",
+    title: "Recommend and carry out third-party consultation (ss 26A, 27, 27A, 15(7))",
+    status: "ready",
+    roles: ["officer"],
+    purpose:
+      "After internal views, work out whether a State, business or person must be given a reasonable opportunity to contend an exemption applies, recommend it to the decision-maker, and consult with the 30-day extension.",
+    when: "Documents the agency is minded to release contain a third party's information. Where internal consultation has already led to a view that the material will be withheld, consultation about that material is not required ([3.90]).",
     checklist: [
       { text: "Decide whether consultation is required: is there a rational basis, on the face of the document or from what you know, that the third party might reasonably wish to contend the relevant exemption applies? A name alone may not be enough ([3.87]–[3.88])." },
       { text: "Have regard to how well known the information is, the person's known association with the matters, and public availability (ss 27(3), 27A(2), [6.157], [6.204]). Generally start from the position that they may wish to make a submission ([6.159], [6.205])." },
-      { text: "No need to consult about material you have already decided to withhold; you may still consult to test your thinking ([3.90], [6.158])." },
+      { text: "Start from the internal views: there is no need to consult about material you have already decided to withhold; you may still consult to test your thinking ([3.90], [6.158])." },
+      { text: "Put the recommendation to consult, and the s 15(6) determination, to the decision-maker for approval. Where the need is obvious, send it with the consultation letter ready to sign (template: third_party_consultation)." },
       { text: "ss 27 and 27A apply only where consultation is reasonably practicable, considering the time limits; consulting hundreds of people is unlikely to be ([3.95], [6.160]–[6.161]). s 26A: where the State may reasonably wish to contend s 47B applies, you cannot release without consulting it under the Commonwealth–State arrangements, through the State agency's FOI contact officer ([3.91]–[3.94], [6.40]–[6.41])." },
       { text: "Foreign governments and international organisations about ss 33(a)(iii) or 33(b): s 15(7)–(8) extension; record extension_s15_8." },
       { text: "Determine in writing that the extension is appropriate and tell the applicant as soon as practicable (s 15(6)) — identify consultation needs early in the first 30 days ([6.162], [6.206]). Record extension_s15_6. Template: extension_s15_6_notice." },
@@ -416,7 +502,7 @@ export const STEPS: Step[] = [
       { text: "Consulting other Commonwealth agencies is good practice but does not extend time ([3.82]–[3.83])." },
     ],
     pitfalls: [
-      "Leaving consultation late, so the s 15(6) extension is wasted or unavailable.",
+      "Letting internal consultation run so long that the s 15(6) extension is wasted or unavailable.",
       "Leading questions ('do you agree release would damage your business?') ([3.100]).",
       "Revealing the applicant's identity to the third party ([3.101]).",
       "Letting the third party believe it has a veto ([6.168], [6.211]).",
@@ -424,88 +510,64 @@ export const STEPS: Step[] = [
     templates: ["extension_s15_6_notice", "third_party_consultation"],
     tools: ["foi_calculate_deadlines", "foi_exemption_guide", "foi_draft_notice"],
     read: ["act:s26A", "act:s27", "act:s27A", "act:s15", "gl:3.87", "gl:3.88", "gl:3.90", "gl:3.94", "gl:3.95", "gl:3.96", "gl:3.98", "gl:3.100", "gl:3.101", "gl:6.159", "gl:6.166"],
-    next: ["search.third_party_decision", "exemptions.schedule"],
+    next: ["consult.submissions", "consult.risks"],
   },
   {
-    id: "search.third_party_decision",
-    stage: "search",
-    title: "Consider submissions, notify third parties, and time the release",
+    id: "consult.submissions",
+    stage: "consult",
+    title: "Consider third-party submissions",
     status: "ready",
     roles: ["officer"],
-    purpose: "Weigh third-party submissions, notify an objecting third party of a decision to release, and hold access until their review opportunities have run out.",
+    purpose: "Weigh what consulted third parties say, before the release position is settled.",
+    when: "A third party was consulted and the response date has passed or a submission has arrived.",
     checklist: [
       { text: "Have regard to every submission (ss 27(4)(b), 27A(3)(b)); the Guidelines say generalised or theoretical submissions make it difficult to accept that the exemption applies. Record the weight given and why ([6.166], [6.168], [6.211])." },
       { text: "A third party may raise other exemptions, which you may rely on; but their review rights are confined to the exemption the consultation provision covers ([6.165], [6.209])." },
-      { text: "If you decide to release over a submission, give written notice to both the third party and the applicant (ss 26A(3), 27(6), 27A(5)). Template: third_party_decision_notice. Record third_party_decision_notice." },
-      { text: "Do not give access until the third party's opportunities for review have run out: 30 days for internal review and IC review from notice (extendable), longer if they seek review ([3.315]). The deadline calculator shows the earliest release date." },
-      { text: "Before releasing, check with the third party — about 3 working days' notice is suggested ([3.316])." },
-      { text: "If the third party was invited but made no submission, there is no notice and no wait (ss 27(8), 27A(7), [3.98], [3.313])." },
-      { text: "Give the applicant access to everything not affected straight away; delay can itself be a refusal ([3.304]–[3.306])." },
+      { text: "If the third party was invited but made no submission, they are not notified of the decision and there is no wait before release (ss 27(8), 27A(7), [3.98], [3.313])." },
+      { text: "If the proposed position is to release over an objection, flag it for the decision-maker now: it leads to an access grant decision, with review rights for the third party and a hold on release of that document (step decision.access_grant)." },
     ],
     pitfalls: [
-      "Releasing before the third party's review window closes.",
-      "Giving the third party a notice that implies they decide the outcome.",
+      "Treating an objection as a veto ([6.168], [6.211]).",
+      "Not recording the weight given to each submission, and why.",
     ],
-    templates: ["third_party_decision_notice", "statement_of_reasons"],
-    tools: ["foi_calculate_deadlines", "foi_draft_notice"],
-    read: ["gl:3.96", "gl:3.98", "gl:3.311", "gl:3.312", "gl:3.313", "gl:3.315", "gl:3.316", "gl:6.168", "gl:6.211"],
-    next: ["exemptions.schedule", "decision.notify_and_release"],
+    tools: ["foi_exemption_guide"],
+    read: ["gl:3.96", "gl:3.98", "gl:3.313", "gl:6.165", "gl:6.166", "gl:6.168", "gl:6.211"],
+    next: ["consult.risks"],
+  },
+  {
+    id: "consult.risks",
+    stage: "consult",
+    title: "Identify risks and sensitivities, and settle the release position",
+    status: "ready",
+    roles: ["officer"],
+    purpose:
+      "Bring the first-pass sensitivities, internal views and any third-party submissions together into a document-by-document position on release, ready to be tested against the exemptions.",
+    checklist: [
+      { text: "Update the first-pass list from intake (step intake.plan) with what internal stakeholders and third parties raised. For each risk record the documents or passages, the harm, who it affects, how likely it is, and the evidence." },
+      { text: "Sort each one: a harm an exemption might cover (take it to stage 5); a real concern that is not a ground to withhold (manage it another way); or a concern that falls away." },
+      {
+        text: "Embarrassment to the Government, the risk of being misunderstood, the author's seniority, and confusion or unnecessary debate must not be taken into account in the public interest test (s 11B(4)). Record these as handling matters, not as reasons to withhold.",
+      },
+      { text: "Record a proposed release position for each document: release, release in part, or withhold, with the harm relied on. Stage 5 tests it: where no exemption's elements are met, the position changes." },
+      {
+        text: "Higher-risk requests, by exception: consider whether anyone needs to be briefed before the decision (for example senior executive, or the area responsible for Cabinet records) and whether release needs a handling plan, such as advance notice. Briefing is for awareness; it does not change who decides (s 23) or the due date.",
+      },
+      { text: "Update the schedule with the position and who was consulted." },
+    ],
+    pitfalls: [
+      "Treating 'sensitive' as a reason to withhold without identifying a harm that an exemption covers.",
+      "A release position that is not revisited when an exemption's elements turn out not to be met.",
+      "Letting a briefing upward push the decision past the due date.",
+    ],
+    templates: ["document_schedule"],
+    tools: ["foi_exemption_guide", "foi_public_interest_test"],
+    read: ["act:s11B", "gl:6.235", "gl:5.15", "act:s23"],
+    next: ["exemptions.exempt", "exemptions.conditional"],
   },
 
   // -------------------------------------------------------------------------
-  // Stage 4 — Exemptions
+  // Stage 5 — Exemptions and proposed decision
   // -------------------------------------------------------------------------
-  {
-    id: "exemptions.schedule",
-    stage: "exemptions",
-    title: "Schedule the documents",
-    status: "ready",
-    roles: ["officer"],
-    purpose: "List every document in scope, so each gets a decision and the statement of reasons can identify them.",
-    checklist: [
-      { text: "Number each document; give date, type, author/recipient role (not names of private individuals), page count and a neutral description that does not reveal exempt matter ([3.288])." },
-      { text: "Mark duplicates and anything outside scope; irrelevant material may be deleted under s 22, but explain it ([3.162]–[3.176])." },
-      { text: "For each document record a proposed decision: release in full, release in part (s 22), or refuse — and the provisions relied on." },
-      { text: "Note which documents need third-party consultation and which need line-area views on harm." },
-    ],
-    pitfalls: ["Descriptions in the schedule that themselves reveal exempt information (s 26(2), [3.286])."],
-    templates: ["document_schedule"],
-    tools: ["foi_draft_notice"],
-    read: ["gl:3.288", "gl:3.162", "act:s22"],
-    next: ["exemptions.line_area_views", "exemptions.exempt", "exemptions.conditional"],
-  },
-  {
-    id: "exemptions.line_area_views",
-    stage: "exemptions",
-    title: "Line-area views on sensitivities",
-    status: "ready",
-    roles: ["officer", "line_area"],
-    purpose: "Get evidence of harm from the people who know the subject, in a form the decision-maker can test and use.",
-    checklist: [
-      { text: "Ask for views document by document, against the specific exemption elements — not 'any concerns' (template: line_area_tasking)." },
-      { text: "Ask for the harm, its likelihood, and the evidence: 'would or could reasonably be expected to' means at least a real, significant or material possibility, not a mere risk or possibility ([5.15]–[5.18])." },
-      { text: "Line area: for each sensitive passage, say what would happen if it were released, to whom, and why that is likely. Point to facts — a live negotiation, an open investigation, a person's safety.", roles: ["line_area"] },
-      {
-        text: "Line area: do not rely on embarrassment to the Government, the risk of being misunderstood, the author's seniority, or confusion or unnecessary debate: s 11B(4) says these must not be taken into account in the public interest test.",
-        roles: ["line_area"],
-      },
-      { text: "Line area: say if information is already public, or would be harmless with time passed. The FOI team must consider release where harm is not shown.", roles: ["line_area"] },
-      { text: "The decision-maker weighs the views; they are evidence, not a direction. Record how each was considered." },
-    ],
-    pitfalls: [
-      "Blanket claims ('the whole document is sensitive') with no specific harm.",
-      "Treating the line area's preference as the decision; the authorised decision-maker decides (s 23).",
-    ],
-    line_area: [
-      "Your views are evidence for the decision-maker. Be specific: page, paragraph, the harm, who it affects, and how likely it is.",
-      "Legitimate harms include: prejudicing an investigation, revealing privileged legal advice, unreasonably disclosing someone's personal information, damaging a business's commercial position, or a substantial adverse effect on agency operations.",
-      "Not legitimate (s 11B(4)): embarrassment or loss of confidence in the Government, that the document could be misunderstood, that its author is senior, or that it could cause confusion or debate.",
-    ],
-    templates: ["line_area_tasking", "line_area_sensitivity_response"],
-    tools: ["foi_exemption_guide", "foi_public_interest_test"],
-    read: ["gl:5.15", "gl:5.19", "act:s11B", "gl:6.235"],
-    next: ["exemptions.exempt", "exemptions.conditional"],
-  },
   {
     id: "exemptions.exempt",
     stage: "exemptions",
@@ -514,7 +576,7 @@ export const STEPS: Step[] = [
     roles: ["officer"],
     purpose: "Test each claimed exemption element by element (ss 33–47A). These have no public interest test, but agencies retain a discretion to release where the law permits (s 3A, [5.2]).",
     checklist: [
-      { text: "Identify the precise provision and paragraph (e.g. s 37(1)(a), not 's 37')." },
+      { text: "Start from the release position settled in consultation (step consult.risks). For each proposed redaction, identify the precise provision and paragraph (e.g. s 37(1)(a), not 's 37')." },
       { text: "Make a finding on each element with reference to evidence — use foi_exemption_guide for the elements and the Guidelines paragraphs." },
       { text: "Check carve-outs: purely factual material (s 34(6)), operational information (s 42(3)), waiver of privilege, information already officially disclosed." },
       { text: "Consider s 25 (neither confirm nor deny) only where s 33, s 37(1) or s 45A would apply to a document's existence." },
@@ -585,6 +647,7 @@ export const STEPS: Step[] = [
       { text: "Delete officials' names and contact details as irrelevant under s 22 only where the applicant has clearly agreed to exclude them; agency policy or silence is not consent ([3.57], [3.166]–[3.167])." },
       { text: "Deferral is limited to the grounds in s 21, with reasons and the expected period ([3.177]–[3.180])." },
       { text: "Give access in the form requested unless s 20(3) applies ([3.319]–[3.323])." },
+      { text: "Put the proposed positions to the decision-maker: the schedule, the marked-up documents and the draft reasons, showing where they follow the consultation and where they depart from it (stage 6)." },
     ],
     pitfalls: ["Redacting so heavily that the edited copy is meaningless — consider whether release is still reasonably practicable."],
     templates: ["document_schedule"],
@@ -593,7 +656,7 @@ export const STEPS: Step[] = [
   },
 
   // -------------------------------------------------------------------------
-  // Stage 5 — Decision, release and review
+  // Stage 6 — Decision, release and review
   // -------------------------------------------------------------------------
   {
     id: "decision.authorisation",
@@ -638,6 +701,35 @@ export const STEPS: Step[] = [
     templates: ["statement_of_reasons", "document_schedule"],
     tools: ["foi_draft_notice"],
     read: ["act:s26", "gl:3.282", "gl:3.287", "gl:3.294", "gl:3.295", "gl:3.299"],
+    next: ["decision.access_grant", "decision.notify_and_release"],
+  },
+  {
+    id: "decision.access_grant",
+    stage: "decision",
+    title: "Access grant decision where a third party objects (ss 26A, 27, 27A)",
+    status: "ready",
+    roles: ["officer"],
+    purpose:
+      "Where the decision is to release a document over a consulted third party's objection, notify the third party and the applicant, and hold that document until the third party's review opportunities have run out.",
+    when: "A third party consulted under s 26A, or who made a submission under s 27 or s 27A, contended that an exemption applies, and the decision-maker is not persuaded.",
+    checklist: [
+      { text: "A decision to give access to a document on which a State, business or person had to be consulted is an access grant decision (s 53B, [1.28])." },
+      { text: "Give written notice of the decision to the third party and to the applicant (ss 26A(3), 27(6), 27A(5)). Template: third_party_decision_notice. Record third_party_decision_notice." },
+      { text: "The notice to the third party sets out their review rights: internal review (s 54A) or IC review (s 54M), each to be sought within 30 days ([3.311]–[3.312], [3.315])." },
+      { text: "Tell the applicant plainly: the decision is to release the document, a third party has objected, and it cannot be released until that process is resolved." },
+      { text: "Do not give access to that document until the third party's opportunities for review have run out — longer if they seek review ([3.315]). The deadline calculator shows the earliest release date." },
+      { text: "Before releasing, check with the third party — about 3 working days' notice is suggested ([3.316])." },
+      { text: "If the third party was invited but made no submission, there is no notice and no wait (ss 27(8), 27A(7), [3.313])." },
+      { text: "Give the applicant access to everything not affected straight away; delay can itself be a refusal ([3.304]–[3.306])." },
+    ],
+    pitfalls: [
+      "Releasing before the third party's review window closes.",
+      "Giving the third party a notice that implies they decide the outcome.",
+      "Holding back the whole release when only some documents are affected.",
+    ],
+    templates: ["third_party_decision_notice", "statement_of_reasons"],
+    tools: ["foi_calculate_deadlines", "foi_draft_notice"],
+    read: ["act:s53B", "act:s54A", "act:s54M", "gl:1.28", "gl:3.311", "gl:3.312", "gl:3.313", "gl:3.315", "gl:3.316"],
     next: ["decision.notify_and_release"],
   },
   {
@@ -649,7 +741,7 @@ export const STEPS: Step[] = [
     purpose: "Notify within the processing period, then give access once charges are paid and third-party review windows have closed.",
     checklist: [
       { text: "Notify the decision by the due date — record decision_notified in the case file." },
-      { text: "Where a third party objected and you decided to release, notify them (ss 27(6), 27A(5)) and do not release until their review opportunities have run out (ss 27(7), 27A(6), [3.311]–[3.316])." },
+      { text: "Where a third party objected and you decided to release, notify them (ss 27(6), 27A(5)) and do not release until their review opportunities have run out (ss 27(7), 27A(6), [3.311]–[3.316]) — see step decision.access_grant." },
       { text: "Give access as soon as practicable; delay can itself amount to a refusal ([3.304]–[3.309])." },
       { text: "Use secure delivery for documents containing personal information." },
       { text: "Record access_given: it starts the disclosure log clock." },

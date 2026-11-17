@@ -10,9 +10,10 @@ A public MCP connector that guides Australian Government FOI practitioners, and 
 |---|---|---|
 | 1. Intake and deadlines | ready | Validity (s 15), transfer (s 16), acknowledgement, statutory date engine, planning and line-area tasking |
 | 2. Scope, charges, practical refusal | ready | Sample-based workload estimator (s 24AA), s 24AB request consultation, charges calculator (Charges Regs Sch 1, regs 7, 12), s 29 notices and contention decisions |
-| 3. Searches and third-party consultation | ready | Search planning and search minutes, s 24A and s 17, consultation under ss 26A/27/27A with the s 15(6) extension, third-party decision notices and release timing |
-| 4. Exemptions | ready | Document schedule, line-area views, exemption elements (ss 33–47J), public interest worksheet (s 11B(3), s 11B(4), weighing) |
-| 5. Decision, release, review | ready | s 23 authorisation, s 26 statement of reasons, third-party review windows, disclosure log (s 11C), internal/IC review |
+| 3. Searches | ready | Search planning and search minutes, s 24A and s 17 |
+| 4. Consultation and assessment | ready | Document schedule with proposed redactions, internal stakeholder consultation, third-party consultation under ss 26A/27/27A with the s 15(6) extension, third-party submissions, risks and sensitivities and the release position |
+| 5. Exemptions and proposed decision | ready | Exemption elements (ss 33–47J), public interest worksheet (s 11B(3), s 11B(4), weighing), edited copies and form of access, proposed positions for the decision-maker |
+| 6. Decision, release, review | ready | s 23 authorisation, s 26 statement of reasons, access grant decisions and third-party review windows, disclosure log (s 11C), internal/IC review |
 
 Tool results cite the Act or numbered paragraphs of the OAIC FOI Guidelines, drawn from a bundled, versioned corpus. The full text is in D1 and searchable through hybrid search (FTS5 + Vectorize/bge-m3).
 

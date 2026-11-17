@@ -289,7 +289,7 @@ describe("intake", () => {
 
 describe("guidance", () => {
   it("returns a step with quoted sources, tailored for the line area", async () => {
-    const { result } = await call("foi_step_guidance", { step: "exemptions.line_area_views", role: "line_area" });
+    const { result } = await call("foi_step_guidance", { step: "consult.internal", role: "line_area" });
     const text = result.content[0].text;
     expect(text).toContain("For the line area");
     expect(text).toContain("s 11B");

@@ -69,7 +69,7 @@ export function processView(role: Role, cf: CaseFile | undefined, step: StepDeta
   return {
     kind: "process",
     title: step ? step.title : "Handling an incoming FOI request",
-    subtitle: step ? `Step ${step.id}${role === "line_area" ? " · for the line area" : ""}` : role === "line_area" ? "The process, for line-area staff" : "The five stages, from receipt to review",
+    subtitle: step ? `Step ${step.id}${role === "line_area" ? " · for the line area" : ""}` : role === "line_area" ? "The process, for line-area staff" : "The six stages, from receipt to review",
     role,
     stages: STAGES.map((s) => ({
       id: s.id,

@@ -114,7 +114,7 @@ export function registerPrompts(server: McpServer): void {
     ({ reference }) =>
       user(
         `I work in a line area and the FOI team has asked me to search for documents and give my views on release${reference ? ` for ${reference}` : ""}.\n\n` +
-          "1. Call foi_step_guidance for exemptions.line_area_views with role line_area and explain, in plain English, what the FOI team needs from me.\n" +
+          "1. Call foi_step_guidance for consult.internal with role line_area and explain, in plain English, what the FOI team needs from me.\n" +
           "2. Help me record my search (where, terms, date range, results).\n" +
           "3. For anything I think is sensitive, ask me what the harm would be, who it affects, how likely it is and the facts that show it. Remind me that the matters in s 11B(4) (embarrassment to the Government, misinterpretation or misunderstanding, the author's seniority, confusion or unnecessary debate) must not be taken into account in the public interest test, and ask me whether any of my reasons rest on them.\n" +
           "4. Call foi_draft_notice with template line_area_sensitivity_response, fill it in, and show me the full draft.\n\n" +
@@ -188,9 +188,9 @@ export function registerPrompts(server: McpServer): void {
     ({ case_file }) =>
       user(
         `Help me with third-party consultation on my FOI request.${case_file ? `\n\nCase file:\n${case_file}` : ""}\n\n` +
-          "1. Call foi_step_guidance for search.consultation. Ask me, in general terms, what kind of third-party information is involved, and help me decide whether consultation is required and reasonably practicable.\n" +
+          "1. Call foi_step_guidance for consult.third_parties. Ask me, in general terms, what kind of third-party information is involved, and help me decide whether consultation is required and reasonably practicable.\n" +
           "2. If it is: draft the applicant's extension notice (template extension_s15_6_notice) and the consultation letter (template third_party_consultation), showing me each draft in full; tell me to record extension_s15_6 and recalculate with foi_calculate_deadlines.\n" +
-          "3. When submissions come back, use search.third_party_decision to weigh them; if releasing over an objection, draft third_party_decision_notice and tell me the earliest release date from foi_calculate_deadlines after I record third_party_decision_notice.\n\n" +
+          "3. When submissions come back, use consult.submissions to weigh them; if releasing over an objection, follow decision.access_grant, draft third_party_decision_notice and tell me the earliest release date from foi_calculate_deadlines after I record third_party_decision_notice.\n\n" +
           PRIVACY,
       ),
   );
