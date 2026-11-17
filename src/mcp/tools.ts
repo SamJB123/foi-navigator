@@ -21,6 +21,7 @@ import { isRecord, nonEmpty } from "../guards.ts";
 import { type CaseFile, caseFile, isoDate } from "../domain/case-file.ts";
 import { computeTimeline, longDate, todayInCanberra } from "../domain/deadlines.ts";
 import { EXEMPTIONS, EXEMPTION_BY_PROVISION, normaliseProvision, suggestExemptions } from "../domain/exemptions.ts";
+import { MATRIX_BASIS, MATRIX_CAUTION, MATRIX_NEXT, MATRIX_TESTS, MATRIX_TEST_IDS, type MatrixRow, assessRow, matrixMarkdown, summarise } from "../domain/evidence-matrix.ts";
 import { FRANKNESS_GUIDANCE, GUIDELINES_AGAINST, GUIDELINES_FOR, IRRELEVANT, STATUTORY_FOR, WEIGHING_STEPS, factorList } from "../domain/public-interest.ts";
 import { aud, estimateCharges } from "../domain/charges.ts";
 import { TEMPLATES, type TemplateId, renderTemplate } from "../domain/templates.ts";
@@ -57,6 +58,10 @@ const PRESENT = {
   step: `${IF_NO_VIEW}give the step's checklist as a checklist, with anything under 'For this request' first.`,
   exemption: `${IF_NO_VIEW}take the user through the elements as a numbered list, then the carve-outs and common errors. Either way, whether each element is met is the decision-maker's finding on the evidence.`,
   exemptionList: `${IF_NO_VIEW}show the table of exemptions as given. These are exemptions often considered for that kind of information, not ones found to apply.`,
+  matrix:
+    `${IF_NO_VIEW}show the matrix table as given first. Either way, walk the user through what the matrix says, one row at a time and in plain English: what each answer means for s 47C, which answer is doing the work, and what would follow if the decision-maker accepts it. ` +
+    "Test the answers against the evidence notes: where an answer has no evidence, or the note sits oddly with the answer (a table of figures answered as opinion, a signed decision answered as advice), say so and ask. Where an answer is 'not sure' or blank, explain that question using its 'yes looks like' and 'no looks like' examples and ask again. " +
+    "You may say which way the answers point and why. Don't say the exemption applies or doesn't apply: that is the decision-maker's finding on the documents, which neither you nor this tool has seen. Record only answers the user gives, never your own inference, and call foi_evidence_matrix again with the rows as they stand.",
   map: `${IF_NO_VIEW}show the stages and steps as a list.`,
   questions: "Ask the user these questions directly, then call foi_start_request again with the answers.",
 };
@@ -463,6 +468,87 @@ export function registerTools(server: McpServer, env: Env): void {
         filename: "exemptions",
       };
       return result(md, { candidates: rows, view }, PRESENT.exemptionList);
+    },
+  );
+
+  // ---------------------------------------------------------------------------
+  const yesNo = z.enum(["yes", "no", "unsure"]).optional();
+  registerAppTool(
+    server,
+    "foi_evidence_matrix",
+    {
+      title: "Evidence matrix for the deliberative exemption (s 47C)",
+      description:
+        "An evidence matrix for the deliberative processes conditional exemption (s 47C): documents or passages down, the five tests of s 47C across, the evidence for each row, and which way the recorded answers point on each test. It records and organises the answers; it does not decide whether the exemption applies. Use the result to walk the user through what their answers mean. " +
+        "For an FOI officer and a line area or decision-maker to fill in together when it is unclear whether material is deliberative. Call it with no rows for a blank matrix and the tests explained in plain English; call it again with the rows as they are answered. " +
+        "Each answer is the user's finding, not yours: ask, don't infer. Give a label for each document or passage (e.g. 'Doc 3, p 2 paras 4–6') and a short note of the evidence, not the document's content.",
+      inputSchema: z.object({
+        provision: z.enum(["47C"]).default("47C").describe("Only s 47C is supported"),
+        rows: z
+          .array(
+            z.object({
+              document: z.string().max(120).describe("A label for the document or passage, e.g. 'Doc 3, p 2 paras 4–6'. Not its content"),
+              matter: z.enum(["yes", "part", "no", "unsure"]).optional().describe("Is it opinion, advice or recommendation, or a record of consultation or deliberation? (s 47C(1))"),
+              process: yesNo.describe("Was it obtained, prepared or recorded in the course of, or for the purposes of, a deliberative process of an agency, a minister or the Government? (s 47C(1))"),
+              factual: z
+                .enum(["no", "part", "intertwined", "yes", "unsure"])
+                .optional()
+                .describe("Is it purely factual? no | part = some, and it can be separated | intertwined = some, but impractical to separate | yes = all of it (s 47C(2)(b))"),
+              operational: yesNo.describe("Is it operational information under s 8A? (s 47C(2)(a))"),
+              excluded: yesNo.describe("Is it a report of scientific or technical experts, or the record of or formal reasons for a final decision? (s 47C(3))"),
+              evidence: z.string().max(500).optional().describe("What supports these answers: a short note, not document content"),
+            }),
+          )
+          .max(60)
+          .default([])
+          .describe("One row per document or passage. Leave an answer out until the user has given it"),
+        case_file: caseFile.optional(),
+      }),
+      outputSchema: z.looseObject({ rows: z.array(z.looseObject({})), summary: z.looseObject({ text: z.string() }) }),
+      annotations: READ_ONLY,
+      _meta: { ui: { resourceUri: VIEW_URI } },
+    },
+    async ({ rows: input, case_file }) => {
+      const e = EXEMPTION_BY_PROVISION.get("47C");
+      if (!e) return toolError("s 47C is not available.");
+      const rows: MatrixRow[] = input.map((r) => {
+        const answers: Record<string, string> = {};
+        for (const id of MATRIX_TEST_IDS) {
+          const v = r[id];
+          if (v) answers[id] = v;
+        }
+        return { document: r.document, answers, evidence: r.evidence ?? "" };
+      });
+      const footer = sourcesLine(["3", "6"]);
+      const md = [matrixMarkdown(rows), "", footer].join("\n");
+      const summary = summarise(rows);
+      const view: View = {
+        kind: "evidence_matrix",
+        title: "Evidence matrix — s 47C",
+        subtitle: `${e.name} · conditional exemption · public interest test required`,
+        ...(case_file ? { case: caseStrip(case_file) } : {}),
+        provision: "47C",
+        name: e.name,
+        rows,
+        footer,
+        links: await guidelineLinks(corpus, [MATRIX_CAUTION, ...MATRIX_NEXT, ...MATRIX_TESTS.flatMap((t) => [...t.yes_looks_like, ...t.no_looks_like]), "[6.50] [6.55] [6.70] [6.71]"]),
+        caveats: [MATRIX_BASIS, CAVEAT_ADVICE],
+        body: md,
+        filename: fileSlug(case_file?.reference, "evidence-matrix-s47c"),
+      };
+      return result(
+        md,
+        {
+          provision: "47C",
+          tests: MATRIX_TESTS,
+          rows: rows.map((r) => ({ ...r, outcome: assessRow(r) })),
+          summary,
+          basis: MATRIX_BASIS,
+          ...(case_file ? { case_file } : {}),
+          view,
+        },
+        PRESENT.matrix,
+      );
     },
   );
 

@@ -65,7 +65,7 @@ export function registerPrompts(server: McpServer): void {
       user(
         `Help me decide whether s ${provision} of the FOI Act applies${information ? ` to ${information}` : ""}.\n\n` +
           `1. Call foi_exemption_guide with provision ${provision}. Walk me through each element and ask me for the facts and evidence I have for it — one element at a time.\n` +
-          "2. Point out carve-outs and the common errors that apply here.\n" +
+          "2. Point out carve-outs and the common errors that apply here. For s 47C, offer foi_evidence_matrix to map each document or passage against the tests; record only the answers I give.\n" +
           "3. If it is a conditional exemption and the elements are met, collect my factors for and against and run foi_public_interest_test, then help me weigh them.\n" +
           "4. Summarise the findings of fact and reasons in a form I can use in the statement of reasons.\n\n" +
           PRIVACY,

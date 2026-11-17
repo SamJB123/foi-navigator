@@ -22,15 +22,15 @@ Tool results cite the Act or numbered paragraphs of the OAIC FOI Guidelines, dra
 - **Tools-first, progressive enhancement.** Tools are the only MCP feature every client supports, so every tool returns complete markdown plus `structuredContent`. Prompts, resources, elicitation and the MCP App add to that, but nothing depends on them.
 - **Client-held case file.** The server is stateless and keeps no case data. Tools return a small JSON case file (dates and procedural events) and take it back. There is no applicant identity and no document content.
 - **Server doesn't need documents.** Tools take procedural facts and general descriptions. Analysis of documents happens in the user's own AI tool, applying the frameworks the server provides.
-- **The decision-maker judges.** Tools present the law, calculations and drafts; they don't classify the officer's reasons or decide legal questions. Results drawn from the user's answers or recorded events say so.
+- **The decision-maker judges.** Tools present the law, calculations and drafts; they don't classify the officer's reasons or decide legal questions. Results drawn from the user's answers or recorded events say so. The s 47C evidence matrix follows the same rule: the officer and line area answer each test for each document, the tool sets each answer beside its test and says which way it points, and the assistant is instructed to walk the user through what that means and to test thin answers against the evidence. Neither says whether the exemption applies.
 - **Deterministic dates.** Deadlines come from a tested engine (`src/domain/deadlines.ts`), never from the model.
 
 ## MCP surface
 
 | Kind | What |
 |---|---|
-| Tools (11, all read-only) | `foi_process_map`, `foi_start_request`, `foi_calculate_deadlines`, `foi_step_guidance`, `foi_estimate_workload`, `foi_estimate_charges`, `foi_exemption_guide`, `foi_public_interest_test`, `foi_draft_notice`, `search`, `fetch` (the last two follow OpenAI's search/fetch contract) |
-| MCP Apps | URIs carry a content hash (`ui://foi-navigator/view-<hash>.html`) so a host can't pair a cached widget with newer data. Timeline: the deadline timeline on `foi_start_request` and `foi_calculate_deadlines`. View: the FOI view on every other tool but `fetch`, with a layout per tool (public interest worksheet with editable factors beside s 11B(3) and s 11B(4); exemption list and element checklists; process stepper with step checklists; drafts with highlighted slots and calculated dates; itemised charges with any reg 7 bar; workload with the evidence statement; search citation cards). Every view shows the case file and fixed caveats, copies as rich text, and exports .docx and .txt. Shows in Claude, ChatGPT, VS Code and M365 Copilot; other clients get text. |
+| Tools (12, all read-only) | `foi_process_map`, `foi_start_request`, `foi_calculate_deadlines`, `foi_step_guidance`, `foi_estimate_workload`, `foi_estimate_charges`, `foi_exemption_guide`, `foi_evidence_matrix`, `foi_public_interest_test`, `foi_draft_notice`, `search`, `fetch` (the last two follow OpenAI's search/fetch contract) |
+| MCP Apps | URIs carry a content hash (`ui://foi-navigator/view-<hash>.html`) so a host can't pair a cached widget with newer data. Timeline: the deadline timeline on `foi_start_request` and `foi_calculate_deadlines`. View: the FOI view on every other tool but `fetch`, with a layout per tool (public interest worksheet with editable factors beside s 11B(3) and s 11B(4); exemption list and element checklists; the s 47C evidence matrix, filled in on screen with its read-out recalculated as cells change; process stepper with step checklists; drafts with highlighted slots and calculated dates; itemised charges with any reg 7 bar; workload with the evidence statement; search citation cards). Every view shows the case file and fixed caveats, copies as rich text, and exports .docx and .txt. Shows in Claude, ChatGPT, VS Code and M365 Copilot; other clients get text. |
 | Presentation | What must reach the user is in the view. Results also carry a short assistant-only note (`annotations.audience: ["assistant"]`) for hosts without MCP Apps: drafts word for word, tables as given. The view's shape is a zod schema (`src/mcp/view-schema.ts`) that the server builds against and the widget validates. |
 | Elicitation | `foi_start_request` asks for missing validity facts with a form (MRTR, 2026-07-28) when the client declares form elicitation. Otherwise it returns the questions as text. |
 | Prompts (11) | `triage_new_request`, `check_deadlines`, `assess_practical_refusal`, `estimate_charges`, `plan_searches`, `consult_third_party`, `assess_exemption`, `draft_statement_of_reasons`, `task_line_area`, `respond_as_line_area`, `draft_notice` |
@@ -54,6 +54,7 @@ src/
     workload.ts       sample-based practical refusal estimate (s 24AA)
     workflow.ts       stages, steps, checklists (cited paragraphs tested to exist)
     exemptions.ts     Part IV exemptions as element checklists
+    evidence-matrix.ts  s 47C evidence matrix: the tests, and which way the answers point
     public-interest.ts  s 11B factors, s 11B(4) text, weighing steps
     templates.ts      notice templates with mandatory content
   mcp/                tools, prompts, resources, MCP App, markdown rendering

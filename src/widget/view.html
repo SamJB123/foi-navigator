@@ -94,6 +94,17 @@
   .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
   tr.deduct td { color: var(--ok); }
   table.factors input[type="text"] { width: 100%; min-width: 200px; }
+  table.matrix th { min-width: 96px; vertical-align: bottom; }
+  table.matrix th .small { font-weight: 400; }
+  table.matrix input[type="text"], table.matrix textarea { width: 100%; min-width: 150px; }
+  table.matrix select { width: 100%; max-width: 170px; }
+  table.matrix td[data-mx-outcome] { min-width: 220px; }
+  textarea { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; resize: vertical; }
+  .mx-status { font-weight: 650; }
+  .mx-status.towards { color: var(--info); }
+  .mx-status.part { color: var(--warn); }
+  .mx-status.away { color: var(--fg); }
+  .mx-status.open { color: var(--fg2); }
 
   .block { margin: 12px 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); }
   blockquote { margin: 8px 0; padding: 2px 10px; border-left: 3px solid var(--line); }
@@ -118,7 +129,7 @@
   .cite-card { padding: 8px 0; border-bottom: 1px solid var(--line); }
   .cite-card p { margin: 4px 0; }
 
-  .stepper { list-style: none; padding: 0; margin: 10px 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+  .stepper { list-style: none; padding: 0; margin: 10px 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
   @media (max-width: 640px) { .stepper { grid-template-columns: 1fr; } }
   .stage { margin: 0; }
   .stage-title { font-weight: 650; font-size: 12.5px; padding-bottom: 4px; border-bottom: 3px solid var(--line); margin-bottom: 4px; }

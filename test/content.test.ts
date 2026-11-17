@@ -8,6 +8,7 @@ import { z } from "zod";
 import passages from "../data/content/passages.json";
 import { must } from "../src/guards.ts";
 import { normaliseRef } from "../src/corpus.ts";
+import { MATRIX_BASIS, MATRIX_CAUTION, MATRIX_NEXT, MATRIX_TESTS, type MatrixRow, assessRow, matrixMarkdown, summarise } from "../src/domain/evidence-matrix.ts";
 import { EXEMPTIONS } from "../src/domain/exemptions.ts";
 import { GUIDELINES_AGAINST, WEIGHING_STEPS } from "../src/domain/public-interest.ts";
 import { estimateCharges } from "../src/domain/charges.ts";
@@ -84,6 +85,48 @@ describe("templates, worksheets and calculators", () => {
       work.evidence_statement,
     ].join("\n");
     for (const id of citations(text)) expect(has(id), id).toBe(true);
+  });
+});
+
+describe("s 47C evidence matrix", () => {
+  const row = (answers: Record<string, string>): MatrixRow => ({ document: "Doc 1", answers, evidence: "" });
+  const all = { matter: "yes", process: "yes", factual: "no", operational: "no", excluded: "no" };
+
+  it("cites real provisions and paragraphs", () => {
+    const cases: Record<string, string>[] = [all, { ...all, factual: "part" }, { ...all, factual: "intertwined" }, { matter: "no" }, { process: "no" }, { operational: "yes" }, { excluded: "yes" }, { factual: "yes" }, {}];
+    const outcomes = cases.map((a) => assessRow(row(a)).reason);
+    const text = [MATRIX_BASIS, MATRIX_CAUTION, ...MATRIX_NEXT, ...MATRIX_TESTS.flatMap((t) => [t.provision, t.question, ...t.yes_looks_like, ...t.no_looks_like]), ...outcomes, summarise([row(all)]).text, summarise([row({ matter: "no" })]).text].join("\n");
+    for (const id of citations(text)) expect(has(id), id).toBe(true);
+  });
+
+  it("says which way the answers point: any one answer can point away from s 47C", () => {
+    expect(assessRow(row(all)).status).toBe("towards");
+    expect(assessRow(row({ ...all, factual: "intertwined" })).status).toBe("towards");
+    expect(assessRow(row({ ...all, factual: "part" })).status).toBe("part");
+    expect(assessRow(row({ ...all, matter: "part" })).status).toBe("part");
+    for (const change of [{ matter: "no" }, { process: "no" }, { factual: "yes" }, { operational: "yes" }, { excluded: "yes" }]) expect(assessRow(row({ ...all, ...change })).status, JSON.stringify(change)).toBe("away");
+  });
+
+  it("stays open while a test is unanswered or unsure, unless an answer already points away", () => {
+    expect(assessRow(row({})).status).toBe("open");
+    expect(assessRow(row({ ...all, process: "unsure" })).status).toBe("open");
+    expect(assessRow(row({ matter: "yes", process: "yes" })).reason).toMatch(/Purely factual; Operational information; Expert report or final decision/);
+    expect(assessRow(row({ matter: "no" })).status).toBe("away");
+  });
+
+  it("reports the answers without deciding whether the exemption applies", () => {
+    const cases: Record<string, string>[] = [all, { ...all, factual: "part" }, { ...all, factual: "intertwined" }, { matter: "no" }, { factual: "yes" }, {}];
+    const said = [...cases.map((a) => `${assessRow(row(a)).label} ${assessRow(row(a)).reason}`), summarise(cases.map(row)).text, matrixMarkdown(cases.map(row))].join("\n");
+    expect(said).not.toMatch(/can be claimed|cannot be claimed|criteria of s 47C are met|is exempt\b|s 47C applies/i);
+    expect(MATRIX_BASIS).toMatch(/does not decide/);
+  });
+
+  it("summarises the rows and points to the public interest test where the answers point towards s 47C", () => {
+    const s = summarise([row(all), row({ ...all, factual: "part" }), row({ matter: "no" }), row({})]);
+    expect(s.counts).toEqual({ towards: 1, part: 1, away: 1, open: 1 });
+    expect(s.text).toMatch(/s 11A\(5\)/);
+    expect(summarise([row({ matter: "no" })]).text).toMatch(/does not fit/);
+    expect(matrixMarkdown([{ document: "Doc | 1", answers: all, evidence: "line\nbreak" }])).toContain("| Doc / 1 | Yes | Yes | No | No | No | line break |");
   });
 });
 

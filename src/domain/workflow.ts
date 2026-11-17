@@ -476,7 +476,7 @@ export const STEPS: Step[] = [
       "Not legitimate (s 11B(4)): embarrassment or loss of confidence in the Government, that the document could be misunderstood, that its author is senior, or that it could cause confusion or debate.",
     ],
     templates: ["line_area_tasking", "line_area_sensitivity_response"],
-    tools: ["foi_exemption_guide", "foi_public_interest_test", "foi_draft_notice"],
+    tools: ["foi_exemption_guide", "foi_evidence_matrix", "foi_public_interest_test", "foi_draft_notice"],
     read: ["gl:5.15", "gl:5.19", "act:s11B", "gl:6.235", "gl:3.82"],
     next: ["consult.third_parties", "consult.risks"],
   },
@@ -599,7 +599,7 @@ export const STEPS: Step[] = [
     purpose: "First establish the statutory criteria of the conditional exemption (ss 47B–47J); only then apply the public interest test (s 11A(5)).",
     checklist: [
       { text: "Two stages: (1) is the document conditionally exempt? (2) would access, on balance, be contrary to the public interest at the time of the decision ([6.7]–[6.11])." },
-      { text: "s 47C covers deliberative matter only — not purely factual material, operational information, or final decisions ([6.46]–[6.78])." },
+      { text: "s 47C covers deliberative matter only — not purely factual material, operational information, or final decisions ([6.46]–[6.78]). Where it is unclear whether material is deliberative, work through foi_evidence_matrix with the line area or decision-maker: documents down, the tests of s 47C across, and the evidence for each." },
       { text: "s 47E(d) needs a substantial adverse effect (serious or significant, not insubstantial or nominal) on the proper and efficient conduct of operations ([6.17]–[6.18], [6.112]–[6.118])." },
       {
         text: "s 47F: personal information whose disclosure would be unreasonable, having regard to s 47F(2). For officials' names and work details, apply those factors in the context of the document; neither classification level nor a presumption either way decides it ([6.146]–[6.152]).",
@@ -612,7 +612,7 @@ export const STEPS: Step[] = [
       "Applying s 47C to purely factual material that can be separated from the deliberative content ([6.70]–[6.71]).",
       "Redacting all staff names as a matter of course without a reason for each.",
     ],
-    tools: ["foi_exemption_guide", "foi_public_interest_test"],
+    tools: ["foi_exemption_guide", "foi_evidence_matrix", "foi_public_interest_test"],
     read: ["gl:6.7", "gl:6.8", "act:s11A", "gl:6.67", "gl:6.112", "gl:6.146"],
     next: ["exemptions.public_interest"],
   },

@@ -67,7 +67,7 @@ async function modern(method: string, params: Record<string, unknown> = {}, caps
 const call = (name: string, args: Record<string, unknown>) => legacy("tools/call", { name, arguments: args });
 
 describe("discovery", () => {
-  it("lists the eleven read-only tools, with the App on the two timeline tools", async () => {
+  it("lists the twelve read-only tools, with the App on the two timeline tools", async () => {
     const { result } = await legacy("tools/list");
     const tools = z
       .array(z.object({ name: z.string(), title: z.string().optional(), annotations: z.object({ readOnlyHint: z.boolean().optional() }).optional(), _meta: z.record(z.string(), z.unknown()).optional() }))
@@ -79,6 +79,7 @@ describe("discovery", () => {
         "foi_draft_notice",
         "foi_estimate_charges",
         "foi_estimate_workload",
+        "foi_evidence_matrix",
         "foi_exemption_guide",
         "foi_process_map",
         "foi_public_interest_test",
@@ -98,6 +99,7 @@ describe("discovery", () => {
       "foi_draft_notice",
       "foi_estimate_charges",
       "foi_estimate_workload",
+      "foi_evidence_matrix",
       "foi_exemption_guide",
       "foi_process_map",
       "foi_public_interest_test",
@@ -115,6 +117,7 @@ describe("discovery", () => {
       ["foi_public_interest_test", { provision: "47C", factors_against: ["release would embarrass the Minister"] }, "public_interest"],
       ["foi_exemption_guide", { information: "legal advice" }, "exemption_list"],
       ["foi_exemption_guide", { provision: "47C" }, "exemption"],
+      ["foi_evidence_matrix", { rows: [{ document: "Doc 1", matter: "yes", process: "yes", factual: "no", operational: "no", excluded: "no" }], case_file: cf }, "evidence_matrix"],
       ["foi_process_map", { case_file: cf }, "process"],
       ["foi_step_guidance", { step: "exemptions.public_interest", case_file: cf }, "process"],
       ["search", { query: "s 47C deliberative" }, "search"],
@@ -154,7 +157,7 @@ describe("discovery", () => {
 
   it("answers a 2026-07-28 tools/list with cache hints", async () => {
     const { result } = await modern("tools/list");
-    expect(result.tools.length).toBe(11);
+    expect(result.tools.length).toBe(12);
     expect(result.cacheScope).toBe("public");
   });
 

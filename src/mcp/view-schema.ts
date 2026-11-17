@@ -134,6 +134,15 @@ export const viewSchema = z.discriminatedUnion("kind", [
   }),
   z.object({
     ...base,
+    kind: z.literal("evidence_matrix"),
+    provision: text,
+    name: text,
+    rows: z.array(z.object({ document: text, answers: z.record(z.string(), z.string()), evidence: text })),
+    /** Appended to the regenerated body when the matrix is edited in the view. */
+    footer: text,
+  }),
+  z.object({
+    ...base,
     kind: z.literal("process"),
     role: z.enum(["officer", "line_area"]),
     stages: z.array(z.object({ id: text, title: text, summary: text, steps: z.array(z.object({ id: text, title: text, purpose: text })) })),

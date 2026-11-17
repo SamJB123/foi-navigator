@@ -6,12 +6,14 @@
  *
  * Every view shows the case file as it stands and fixed caveats. Interactive parts:
  * the public interest factors can be edited and re-checked here (the same check the
- * server runs); exemptions, steps, templates and search results open in place through
+ * server runs); the s 47C evidence matrix is filled in here, with its read-out
+ * recalculated as cells change; exemptions, steps, templates and search results open in place through
  * the host's tool proxy; drafts and reports copy as rich text or export to Word.
  * Anything the officer does here is reported back with ui/update-model-context.
  */
 import { App, applyDocumentTheme, applyHostStyleVariables } from "@modelcontextprotocol/ext-apps";
 import { longDate } from "../domain/deadlines.ts";
+import { MATRIX_BASIS, MATRIX_CAUTION, MATRIX_NEXT, MATRIX_TESTS, type MatrixOutcome, type MatrixRow, assessRow, matrixMarkdown, summarise } from "../domain/evidence-matrix.ts";
 import { factorList } from "../domain/public-interest.ts";
 import { isRecord } from "../guards.ts";
 import { type View, viewSchema } from "../mcp/view-schema.ts";
@@ -201,6 +203,7 @@ function renderExemption(v: Extract<View, { kind: "exemption" }>): string {
         : "<b>Exemption.</b> No public interest test, but there is still a discretion to release (s 3A)."
     }</div>
     <p>${rich(e.summary, v.links)}</p>
+    ${e.provision === "47C" ? `<div class="row"><button type="button" data-action="open-matrix">Open the evidence matrix</button><span class="small muted">Map each document or passage against the tests of s 47C.</span></div>` : ""}
     <h2>Elements: make a finding on each, with evidence</h2>
     ${checklist(e.elements, v.links, `element-${e.provision}`)}
     ${e.harm_test ? `<p><b>Harm threshold:</b> ${rich(e.harm_test, v.links)}</p>` : ""}
@@ -215,6 +218,46 @@ function renderExemption(v: Extract<View, { kind: "exemption" }>): string {
       v.key_paragraphs.map((p) => `<div class="cite-card"><a href="#" data-url="${esc(p.url)}"><b>${esc(p.ref)}</b></a> <span class="muted">${esc(p.title)}</span><p>${esc(p.text)}</p></div>`).join(""),
     )}`;
   return shell(v, e.kind === "conditional" ? "Conditional exemption" : "Exemption", inner, exportButtons("guide"));
+}
+
+const outcomeHtml = (o: MatrixOutcome, links: Record<string, string>) => `<span class="mx-status ${o.status}">${esc(o.label)}</span><div class="small">${rich(o.reason, links)}</div>`;
+
+function renderMatrix(v: Extract<View, { kind: "evidence_matrix" }>): string {
+  const rows = v.rows
+    .map(
+      (r, n) => `<tr data-matrix-row="${n}">
+        <td><input type="text" data-mx-doc value="${esc(r.document)}" placeholder="e.g. Doc 3, p 2 paras 4–6" aria-label="Document or passage"></td>
+        ${MATRIX_TESTS.map(
+          (t) =>
+            `<td><select data-mx-test="${t.id}" aria-label="${esc(t.heading)}"><option value="">—</option>${t.options
+              .map((o) => `<option value="${esc(o.value)}"${r.answers[t.id] === o.value ? " selected" : ""}>${esc(o.label)}</option>`)
+              .join("")}</select></td>`,
+        ).join("")}
+        <td><textarea data-mx-evidence rows="2" placeholder="What shows this?" aria-label="Evidence">${esc(r.evidence)}</textarea></td>
+        <td data-mx-outcome>${outcomeHtml(assessRow(r), v.links)}</td>
+        <td><button type="button" class="link" data-remove-row="${n}" aria-label="Remove row">✕</button></td>
+      </tr>`,
+    )
+    .join("");
+  const inner = `
+    <div class="banner info"><b>Where the answers point</b><p data-mx-summary>${rich(summarise(v.rows).text, v.links)}</p></div>
+    <p class="small muted">Describe each document or passage with a label, not its content. Answer the five questions together, and note what shows it.</p>
+    <div class="table"><table class="matrix">
+      <thead><tr><th>Document or passage</th>${MATRIX_TESTS.map((t, i) => `<th title="${esc(t.question)}">${i + 1}. ${esc(t.heading)}<div class="small">${esc(t.provision)}</div></th>`).join("")}<th>Evidence</th><th>Where the answers point</th><th></th></tr></thead>
+      <tbody>${rows || `<tr><td colspan="${MATRIX_TESTS.length + 4}" class="muted">No rows yet. Add a document or passage.</td></tr>`}</tbody>
+    </table></div>
+    <div class="row"><button type="button" data-action="add-row">Add document or passage</button><button type="button" class="primary" data-action="walk-matrix">Walk me through this</button><button type="button" data-action="save-matrix">Update matrix</button><button type="button" data-open-pit="${esc(v.provision)}">Run the public interest test</button></div>
+    <h2>The five questions</h2>
+    <p class="small">${rich(MATRIX_CAUTION, v.links)}</p>
+    ${MATRIX_TESTS.map((t, i) =>
+      section(
+        `${i + 1}. ${t.heading} (${t.provision})`,
+        `<p>${esc(t.question)}</p><p class="small"><b>A “yes” looks like</b></p>${list(t.yes_looks_like, v.links)}<p class="small"><b>A “no” looks like</b></p>${list(t.no_looks_like, v.links)}`,
+        i === 0,
+      ),
+    ).join("")}
+    ${section("What comes next", list(MATRIX_NEXT, v.links))}`;
+  return shell(v, `Evidence matrix · s ${v.provision}`, inner, exportButtons("matrix"));
 }
 
 function renderProcess(v: Extract<View, { kind: "process" }>): string {
@@ -295,6 +338,9 @@ function render() {
       break;
     case "exemption":
       root.innerHTML = renderExemption(v);
+      break;
+    case "evidence_matrix":
+      root.innerHTML = renderMatrix(v);
       break;
     case "process":
       root.innerHTML = renderProcess(v);
@@ -410,6 +456,42 @@ function saveFactors(v: Extract<View, { kind: "public_interest" }>, edited: { fa
   say("Factors updated");
 }
 
+/** Read the evidence matrix rows as edited. */
+function editedRows(): MatrixRow[] {
+  const out: MatrixRow[] = [];
+  for (const tr of root.querySelectorAll("tr[data-matrix-row]")) {
+    const doc = tr.querySelector("[data-mx-doc]");
+    const evidence = tr.querySelector("[data-mx-evidence]");
+    const answers: Record<string, string> = {};
+    for (const sel of tr.querySelectorAll("select[data-mx-test]")) {
+      if (sel instanceof HTMLSelectElement && sel.dataset.mxTest && sel.value) answers[sel.dataset.mxTest] = sel.value;
+    }
+    out.push({ document: doc instanceof HTMLInputElement ? doc.value.trim() : "", answers, evidence: evidence instanceof HTMLTextAreaElement ? evidence.value.trim() : "" });
+  }
+  return out;
+}
+
+/** Keep the edited matrix (and its export) in the view. `redraw` false patches the read-out in place, so typing isn't interrupted. */
+function keepMatrix(v: Extract<View, { kind: "evidence_matrix" }>, rows: MatrixRow[], redraw: boolean) {
+  history[history.length - 1] = { ...v, rows, body: `${matrixMarkdown(rows)}\n\n${v.footer}` };
+  if (redraw) {
+    render();
+    return;
+  }
+  [...root.querySelectorAll("[data-mx-outcome]")].forEach((td, n) => {
+    const row = rows[n];
+    if (row) td.innerHTML = outcomeHtml(assessRow(row), v.links);
+  });
+  const summary = root.querySelector("[data-mx-summary]");
+  if (summary) summary.innerHTML = rich(summarise(rows).text, v.links);
+}
+
+/** Tell the model what the matrix now says. */
+function shareMatrix(rows: MatrixRow[]) {
+  const withOutcome = rows.map((r) => ({ ...r, outcome: assessRow(r).label }));
+  note(`The officer updated the s 47C evidence matrix in the FOI view. Rows: ${JSON.stringify(withOutcome)}. ${summarise(rows).text} ${MATRIX_BASIS}`, { provision: "47C", rows: withOutcome });
+}
+
 root.addEventListener("click", (ev) => {
   const target = ev.target instanceof Element ? ev.target : null;
   const v = history.at(-1);
@@ -446,7 +528,31 @@ root.addEventListener("click", (ev) => {
     const row = el.closest("tr");
     row?.remove();
     saveFactors(v, editedFactors());
-  } else if (d.openExemption) void open("foi_exemption_guide", { provision: d.openExemption }, `Open s ${d.openExemption} in the exemption guide.`);
+  } else if (d.action === "add-row" && v.kind === "evidence_matrix") {
+    keepMatrix(v, [...editedRows(), { document: "", answers: {}, evidence: "" }], true);
+    const last = [...root.querySelectorAll("[data-mx-doc]")].at(-1);
+    if (last instanceof HTMLInputElement) last.focus();
+  } else if (d.action === "save-matrix" && v.kind === "evidence_matrix") {
+    const rows = editedRows();
+    keepMatrix(v, rows, true);
+    shareMatrix(rows);
+    say("Matrix updated");
+  } else if (d.action === "walk-matrix" && v.kind === "evidence_matrix") {
+    const rows = editedRows();
+    keepMatrix(v, rows, true);
+    shareMatrix(rows);
+    void app
+      .sendMessage({
+        role: "user",
+        content: [{ type: "text", text: "Walk me through what this s 47C evidence matrix says, one row at a time: what each answer means, where the evidence looks thin, and what I should check before the decision-maker relies on it." }],
+      })
+      .catch(() => say("Ask in the chat for a walk-through"));
+  } else if (d.removeRow !== undefined && v.kind === "evidence_matrix") {
+    const rows = editedRows().filter((_, n) => String(n) !== d.removeRow);
+    keepMatrix(v, rows, true);
+    shareMatrix(rows);
+  } else if (d.action === "open-matrix") void open("foi_evidence_matrix", { ...(lastCaseFile ? { case_file: lastCaseFile } : {}) }, "Open the evidence matrix for s 47C.");
+  else if (d.openExemption) void open("foi_exemption_guide", { provision: d.openExemption }, `Open s ${d.openExemption} in the exemption guide.`);
   else if (d.openPit) void open("foi_public_interest_test", { provision: d.openPit }, `Run the public interest test for s ${d.openPit}.`);
   else if (d.openStep) {
     const role = v.kind === "process" ? v.role : "officer";
@@ -457,6 +563,11 @@ root.addEventListener("click", (ev) => {
 
 root.addEventListener("change", (ev) => {
   const box = ev.target;
+  const v = history.at(-1);
+  if (v?.kind === "evidence_matrix" && box instanceof Element && box.closest("tr[data-matrix-row]")) {
+    keepMatrix(v, editedRows(), false);
+    return;
+  }
   if (!(box instanceof HTMLInputElement) || !box.dataset.check) return;
   if (box.checked) ticked.add(box.dataset.check);
   else ticked.delete(box.dataset.check);
