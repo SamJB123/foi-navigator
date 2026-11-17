@@ -7,7 +7,9 @@
  * Dates come from the deadline engine; nothing here invents a date.
  */
 import type { CaseFile } from "./case-file.ts";
-import { type Timeline, longDate } from "./deadlines.ts";
+import type { Timeline } from "./deadlines.ts";
+import { DECISION_TYPE_HELP, internalReviewDecision, noticeOfDecision, practicalRefusalDecision, revisedDecision, scheduleOfDocuments } from "./decision-notices.ts";
+import { type Ctx, date, dueOf, lastDayOf, received, ref, scope, slot } from "./template-helpers.ts";
 
 export type TemplateId =
   | "acknowledgement"
@@ -20,6 +22,7 @@ export type TemplateId =
   | "statement_of_reasons"
   | "disclosure_log_entry"
   | "internal_review_decision"
+  | "revised_decision_s55G"
   | "s24AB_notice"
   | "practical_refusal_decision"
   | "s29_charges_notice"
@@ -38,16 +41,7 @@ export type Template = {
   body: (ctx: Ctx) => string;
 };
 
-type Ctx = { cf?: CaseFile; tl?: Timeline; d: Record<string, string> };
-
-const slot = (ctx: Ctx, key: string, hint: string) => ctx.d[key] ?? `[[${hint}]]`;
-const date = (iso?: string | null) => (iso ? longDate(iso) : undefined);
-const dueOf = (ctx: Ctx) => date(ctx.tl?.processing.effective_due) ?? "[[decision due date — run foi_calculate_deadlines]]";
-/** The 30th day itself, not rolled past a weekend: s 15AA agreements must be made by then ([3.247] fn 171). */
-const lastDayOf = (ctx: Ctx) => date(ctx.tl?.processing.statutory_due) ?? "[[last day of the processing period — run foi_calculate_deadlines]]";
-const ref = (ctx: Ctx) => ctx.cf?.reference ?? slot(ctx, "reference", "FOI reference");
-const received = (ctx: Ctx) => date(ctx.cf?.received_date) ?? "[[date received]]";
-const scope = (ctx: Ctx) => ctx.cf?.summary ?? slot(ctx, "scope", "scope of the request, as you understand it");
+export { DECISION_TYPE_HELP };
 
 export const REVIEW_RIGHTS = `## Your review rights
 
@@ -214,20 +208,14 @@ ${slot(ctx, "context", "Context that helps the decision-maker — e.g. a decisio
     audience: "applicant",
     purpose: "Identify each document and the decision on it, without revealing exempt matter.",
     provisions: ["s 26", "s 22", "[3.288]"],
-    must_include: ["document number", "date", "neutral description", "pages", "decision (full / part / refused)", "provisions applied"],
-    body: (ctx) => `**FOI reference:** ${ref(ctx)}
-
-| No. | Date | Description | Pages | Decision | Provisions |
-|---|---|---|---|---|---|
-| 1 | ${slot(ctx, "row_date", "date")} | ${slot(ctx, "row_desc", "neutral description, e.g. 'Email from Branch to Minister's Office'")} | ${slot(ctx, "row_pages", "n")} | ${slot(ctx, "row_decision", "Release in full / Release in part / Refuse")} | ${slot(ctx, "row_provisions", "e.g. s 47F, s 22")} |
-
-*Describe documents without disclosing exempt matter ([3.288]; s 26(2)). Use roles, not private individuals' names.*`,
+    must_include: ["document number", "date", "size in pages", "neutral description", "decision on release, with the provisions applied"],
+    body: scheduleOfDocuments,
   },
   {
     id: "statement_of_reasons",
-    title: "Decision and statement of reasons (s 26)",
+    title: "Notice of decision and statement of reasons (s 26)",
     audience: "applicant",
-    purpose: "Notify the decision with findings of fact, evidence, reasons, the decision-maker, and review rights.",
+    purpose: `Notify the decision with findings of fact, evidence, reasons, the decision-maker, and review rights. ${DECISION_TYPE_HELP}.`,
     provisions: ["s 26", "s 23", "[3.281]–[3.300]", "[6.237]"],
     must_include: [
       "the decision on each document or part (s 26(1))",
@@ -237,43 +225,8 @@ ${slot(ctx, "context", "Context that helps the decision-maker — e.g. a decisio
       "grounds for s 22 deletions",
       "name and designation of the decision-maker and their s 23 authority (s 26(1)(b))",
       "review and complaint rights",
-      "disclosure log notice",
     ],
-    body: (ctx) => `**Our reference:** ${ref(ctx)}
-
-## Decision on your request under the Freedom of Information Act 1982
-
-### Your request
-On ${received(ctx)} you requested:
-> ${scope(ctx)}
-
-${slot(ctx, "process_history", "Any revisions to scope, extensions (s 15(6), s 15AA, s 15AB), consultations and charges, with dates")}
-
-### Decision
-I am an officer authorised under s 23 of the FOI Act to make decisions on FOI requests. I have decided to ${slot(ctx, "decision_summary", "grant access in full / grant access in part / refuse access")} to the ${slot(ctx, "document_count", "number")} documents within scope, as set out in the attached schedule.
-
-### Material taken into account
-${slot(ctx, "material", "The documents; the FOI Act; the FOI Guidelines; consultation responses; line-area submissions; search records — describe each so it can be identified ([3.290])")}
-
-### Findings of fact and reasons
-${slot(ctx, "per_exemption_reasons", "For each provision applied: quote the provision, state the findings of fact on each element with the evidence for each, and explain why the provision applies to the specific documents or parts ([3.287]–[3.294]).")}
-
-### Public interest test (conditionally exempt material)
-${slot(ctx, "public_interest", "For each conditional exemption: the factors favouring access (including s 11B(3)), the factors against, a statement that no s 11B(4) irrelevant factor was considered, the weight given to each, and why on balance access would be contrary to the public interest at this time ([6.237]). Use foi_public_interest_test.")}
-
-### Deletions (s 22)
-${slot(ctx, "deletions", "The grounds for each deletion, including any irrelevant material and why ([3.297]).")}
-
-${REVIEW_RIGHTS}
-
-## Disclosure log
-${slot(ctx, "disclosure_log", "If the released documents will be published on our disclosure log (s 11C), say so; note personal and business information will not be published where unreasonable.")}
-
-Yours sincerely,
-
-${slot(ctx, "decision_maker", "decision-maker's name")}
-${slot(ctx, "designation", "position / designation")}
-${slot(ctx, "decision_date", "date")}`,
+    body: noticeOfDecision,
   },
   {
     id: "disclosure_log_entry",
@@ -299,23 +252,22 @@ ${slot(ctx, "decision_date", "date")}`,
     purpose: "A fresh decision by a different officer within 30 days of the application.",
     provisions: ["s 54C", "s 26", "[9.33]–[9.53]"],
     must_include: ["that the reviewer is not the original decision-maker", "a fresh decision on the merits", "s 26 content", "IC review rights"],
-    body: (ctx) => `**Our reference:** ${ref(ctx)}
-
-## Internal review decision
-
-On ${slot(ctx, "ir_received", "date")} you applied for internal review of the decision of ${slot(ctx, "original_date", "date")} on your FOI request. I am authorised to conduct internal reviews and I did not make the original decision (s 54C(2)). I have made a fresh decision.
-
-### Decision
-${slot(ctx, "decision_summary", "Affirm / vary / set aside, and the outcome for each document")}
-
-### Findings and reasons
-${slot(ctx, "reasons", "As for a s 26 statement of reasons: findings of fact, evidence, reasons, and public interest weighing for conditional exemptions")}
-
-## Your review rights
-You may apply to the Australian Information Commissioner for review of this decision within 60 days after the day you are notified of it (s 54S(1)), at www.oaic.gov.au. You may also complain to the Information Commissioner about how we handled your request.
-
-Yours sincerely,
-${slot(ctx, "decision_maker", "name")}, ${slot(ctx, "designation", "designation")}`,
+    body: internalReviewDecision,
+  },
+  {
+    id: "revised_decision_s55G",
+    title: "Revised decision during IC review (s 55G)",
+    audience: "applicant",
+    purpose: "Vary an access refusal decision in the applicant's favour while it is under Information Commissioner review, and tell the applicant and the Commissioner.",
+    provisions: ["s 55G", "s 26", "[10.79]"],
+    must_include: [
+      "that the decision is revised under s 55G in the applicant's favour",
+      "the revised decision on each document, with reasons",
+      "public interest factors for conditional exemptions",
+      "that the Information Commissioner is notified (s 55G(2)(a)) and the revised decision becomes the decision under review",
+      "the decision-maker's name, designation and s 23 authority",
+    ],
+    body: revisedDecision,
   },
 ];
 
@@ -388,31 +340,7 @@ ${slot(ctx, "sender", "name, position")}
       "the decision-maker's name, designation and authority",
       "review rights",
     ],
-    body: (ctx) => `**Our reference:** ${ref(ctx)}
-
-## Decision on your request under the Freedom of Information Act 1982
-
-On ${received(ctx)} you requested:
-> ${scope(ctx)}
-
-On ${slot(ctx, "s24AB_date", "date")} we gave you a notice under s 24AB of the FOI Act and invited you to consult with ${slot(ctx, "contact_officer", "contact person")} to revise your request. ${slot(ctx, "consultation_history", "What happened: e.g. 'You contacted us on … and revised your request to … / indicated you did not wish to revise it.' Include the assistance offered.")}
-
-### Decision
-I am an officer authorised under s 23 of the FOI Act. I am satisfied that a practical refusal reason still exists in relation to your ${slot(ctx, "request_kind", "revised")} request, and I have decided to refuse access under s 24(1)(b).
-
-### Findings and reasons
-${slot(ctx, "findings", "The number of documents within scope and how that was established (searches, records kept); the sample assessed (size, %, by whom); the estimated time for each activity in s 24AA(2) — identifying, locating and collating; examining and deciding; consulting; making edited copies; notifying — and the total.")}
-
-${slot(ctx, "substantial_unreasonable", "Why the work is substantial (ordinary meaning, [3.207]) and why it is unreasonable: the agency's size and FOI resourcing, the impact on other operations and other FOI requests, any public interest in the documents ([3.201], [3.212]–[3.216]).")}
-
-In reaching this decision I have not had regard to any reasons you gave for your request, or to my belief about your reasons, or to any maximum charge (s 24AA(3)).
-
-${REVIEW_RIGHTS}
-
-Yours sincerely,
-
-${slot(ctx, "decision_maker", "decision-maker's name")}
-${slot(ctx, "designation", "position / designation")}`,
+    body: practicalRefusalDecision,
   },
   {
     id: "s29_charges_notice",
@@ -631,6 +559,7 @@ export function renderTemplate(id: TemplateId, cf: CaseFile | undefined, tl: Tim
   const t = TEMPLATE_BY_ID.get(id);
   if (!t) throw new Error(`No template "${id}"`);
   const text = t.body({ cf, tl, d: details });
-  const unfilled = [...text.matchAll(/\[\[([^\]]+)\]\]/g)].map((m) => m[1]);
+  // Each slot once, however often the draft repeats it (the agency's name, the contact address).
+  const unfilled = [...new Set([...text.matchAll(/\[\[([^\]]+)\]\]/g)].map((m) => m[1]))];
   return { template: t, text, unfilled };
 }

@@ -348,6 +348,9 @@ describe("guidance", () => {
       "third_party_consultation",
       "third_party_decision_notice",
       "statement_of_reasons",
+      "document_schedule",
+      "internal_review_decision",
+      "revised_decision_s55G",
     ]) {
       const r = (await call("foi_draft_notice", { template, case_file: cf })).result.structuredContent;
       expect(r.text, template).toContain("FOI-T");
@@ -394,6 +397,30 @@ describe("guidance", () => {
     expect(sc.text).toContain("Information Commissioner review");
     expect(sc.text).toContain("grant access in part");
     expect(sc.unfilled.length).toBeGreaterThan(0);
+    expect(new Set(sc.unfilled).size).toBe(sc.unfilled.length);
+  });
+
+  it("drafts the notice of decision for each outcome, and states extensions from the case file", async () => {
+    const draft = async (decision_type: string, case_file: Record<string, unknown> = { reference: "FOI-9", received_date: "2026-11-02", events: [] }) =>
+      (await call("foi_draft_notice", { template: "statement_of_reasons", case_file, details: { decision_type, agency_short: "the department" } })).result.structuredContent.text;
+    const full = await draft("full");
+    expect(full).toContain("grant access in full");
+    expect(full).not.toContain("Reasons for decision");
+    expect(await draft("full_irrelevant")).toContain("1. Deletion of irrelevant matter");
+    const part = await draft("part_s24A");
+    expect(part).toContain("Section 24A(1) of the FOI Act provides");
+    expect(part).toContain("4. Deletion of irrelevant matter");
+    const none = await draft("no_documents");
+    expect(none).toContain("documents cannot be found or do not exist");
+    expect(none).not.toContain("Schedule of Documents");
+    expect(await draft("refuse")).toContain("refuse access to the document(s)");
+    for (const text of [full, part, none]) {
+      expect(text).toContain("the department");
+      expect(text).toContain("section 54L");
+    }
+    const extended = await draft("part", { reference: "FOI-9", received_date: "2026-11-02", events: [{ type: "extension_s15AA", date: "2026-11-20", days: 14 }] });
+    expect(extended).toContain("you agreed to extend the processing period");
+    expect(extended).not.toContain("Option: an extension applied");
   });
 });
 

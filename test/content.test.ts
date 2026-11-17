@@ -12,6 +12,7 @@ import { MATRIX_BASIS, MATRIX_CAUTION, MATRIX_NEXT, MATRIX_TESTS, type MatrixRow
 import { EXEMPTIONS } from "../src/domain/exemptions.ts";
 import { GUIDELINES_AGAINST, WEIGHING_STEPS } from "../src/domain/public-interest.ts";
 import { estimateCharges } from "../src/domain/charges.ts";
+import { DECISION_TYPES } from "../src/domain/decision-notices.ts";
 import { REVIEW_RIGHTS, TEMPLATES, renderTemplate } from "../src/domain/templates.ts";
 import { estimateWorkload } from "../src/domain/workload.ts";
 import { STEPS } from "../src/domain/workflow.ts";
@@ -64,7 +65,17 @@ describe("exemptions", () => {
 
 describe("templates, worksheets and calculators", () => {
   it("cite real provisions", () => {
-    const rendered = TEMPLATES.map((t) => renderTemplate(t.id, { reference: "X", received_date: "2026-11-02", events: [] }, undefined).text);
+    const cf = { reference: "X", received_date: "2026-11-02", events: [] };
+    const rendered = [
+      ...TEMPLATES.map((t) => renderTemplate(t.id, cf, undefined).text),
+      ...DECISION_TYPES.map((decision_type) => renderTemplate("statement_of_reasons", cf, undefined, { decision_type }).text),
+    ];
+    // In the decision notices, a slot's hint must not contain "]", or the slot is not recognised as one.
+    const notices = [
+      ...(["document_schedule", "practical_refusal_decision", "internal_review_decision", "revised_decision_s55G"] as const).map((id) => renderTemplate(id, cf, undefined).text),
+      ...DECISION_TYPES.map((decision_type) => renderTemplate("statement_of_reasons", cf, undefined, { decision_type }).text),
+    ];
+    for (const text of notices) expect(text.replace(/\[\[[^\]]+\]\]/g, "")).not.toContain("[[");
     const charges = estimateCharges({ search_hours: 3, decision_hours: 8 });
     const work = estimateWorkload({ documents_in_scope: 500, sample_documents: 20, search_hours: 10, sample_examine_minutes: 120 });
     const text = [

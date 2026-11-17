@@ -24,7 +24,7 @@ import { EXEMPTIONS, EXEMPTION_BY_PROVISION, normaliseProvision, suggestExemptio
 import { MATRIX_BASIS, MATRIX_CAUTION, MATRIX_NEXT, MATRIX_TESTS, MATRIX_TEST_IDS, type MatrixRow, assessRow, matrixMarkdown, summarise } from "../domain/evidence-matrix.ts";
 import { FRANKNESS_GUIDANCE, GUIDELINES_AGAINST, GUIDELINES_FOR, IRRELEVANT, STATUTORY_FOR, WEIGHING_STEPS, factorList } from "../domain/public-interest.ts";
 import { aud, estimateCharges } from "../domain/charges.ts";
-import { TEMPLATES, type TemplateId, renderTemplate } from "../domain/templates.ts";
+import { DECISION_TYPE_HELP, TEMPLATES, type TemplateId, renderTemplate } from "../domain/templates.ts";
 import { estimateWorkload } from "../domain/workload.ts";
 import { STAGES, STEPS, STEP_BY_ID, type Step, stepsIn } from "../domain/workflow.ts";
 import { TIMELINE_URI, VIEW_URI } from "./app.ts";
@@ -638,7 +638,12 @@ export function registerTools(server: McpServer, env: Env): void {
       inputSchema: z.object({
         template: z.enum(TEMPLATE_IDS),
         case_file: caseFile.optional(),
-        details: z.record(z.string(), z.string().max(4000)).optional().describe("Slot values by name, e.g. { contact_officer: 'FOI Officer', decision_summary: 'grant access in part' }"),
+        details: z
+          .record(z.string(), z.string().max(4000))
+          .optional()
+          .describe(
+            `Slot values by name, e.g. { agency_name: 'the Department of X', agency_short: 'the department', foi_contact: 'foi@agency.gov.au' }. For statement_of_reasons, ${DECISION_TYPE_HELP}. Never pass the applicant's name: the FOI team adds it.`,
+          ),
       }),
       outputSchema: z.looseObject({ text: z.string(), must_include: z.array(z.string()), unfilled: z.array(z.string()) }),
       annotations: READ_ONLY,

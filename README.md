@@ -34,7 +34,7 @@ Tool results cite the Act or numbered paragraphs of the OAIC FOI Guidelines, dra
 | Presentation | What must reach the user is in the view. Results also carry a short assistant-only note (`annotations.audience: ["assistant"]`) for hosts without MCP Apps: drafts word for word, tables as given. The view's shape is a zod schema (`src/mcp/view-schema.ts`) that the server builds against and the widget validates. |
 | Elicitation | `foi_start_request` asks for missing validity facts with a form (MRTR, 2026-07-28) when the client declares form elicitation. Otherwise it returns the questions as text. |
 | Prompts (11) | `triage_new_request`, `check_deadlines`, `assess_practical_refusal`, `estimate_charges`, `plan_searches`, `consult_third_party`, `assess_exemption`, `draft_statement_of_reasons`, `task_line_area`, `respond_as_line_area`, `draft_notice` |
-| Templates (17) | acknowledgement, request clarification, s 15AA and s 15(6) extensions, s 24AB notice, practical refusal decision, s 29 charges notice, charges contention decision, search minute, line-area tasking and response, third-party consultation and decision notices, document schedule, statement of reasons, disclosure log entry, internal review decision |
+| Templates (18) | acknowledgement, request clarification, s 15AA and s 15(6) extensions, s 24AB notice, practical refusal decision, s 29 charges notice, charges contention decision, search minute, line-area tasking and response, third-party consultation and decision notices, document schedule, notice of decision and statement of reasons (six outcomes, chosen with `details.decision_type`), disclosure log entry, internal review decision, revised decision under s 55G. The decision notices follow PM&C's FOI templates (`src/domain/decision-notices.ts`). |
 | Resources | `foi://guide`, `foi://process-map`, `foi://sources`, `foi://act/{section}`, `foi://guidelines/{paragraph}`, `foi://guidelines/part/{part}`, `foi://exemptions/{provision}` |
 
 Protocol: `@modelcontextprotocol/server` 2.3.1 `createMcpHandler`, stateless (spec 2026-07-28), with the legacy stateless lane for 2025-era clients. There is no Durable Object, and no `agents` McpAgent.
@@ -57,6 +57,7 @@ src/
     evidence-matrix.ts  s 47C evidence matrix: the tests, and which way the answers point
     public-interest.ts  s 11B factors, s 11B(4) text, weighing steps
     templates.ts      notice templates with mandatory content
+    decision-notices.ts  the decision notices, following PM&C's templates
   mcp/                tools, prompts, resources, MCP App, markdown rendering
   widget/             the MCP App source (bundled into dist/timeline.html)
 scripts/              fetch sources → build corpus → index vectors; widget build; live smoke test
@@ -102,3 +103,4 @@ FOI_URL=https://<your worker> FOI_ADMIN_TOKEN=… node scripts/index-vectors.ts
 
 - FOI Act 1982 and FOI (Charges) Regulations 2019 come from the Federal Register of Legislation (CC BY 4.0). "Based on content from the Federal Register of Legislation. For the latest information on Australian Government legislation please go to https://www.legislation.gov.au."
 - OAIC FOI Guidelines come from www.oaic.gov.au, © Commonwealth of Australia, CC BY 4.0. They have been reformatted into passages and are not endorsed by the OAIC.
+- The decision notice templates follow the structure and wording of the Department of the Prime Minister and Cabinet's FOI templates, as released under FOI (reference FOI/2026/081), © Commonwealth of Australia. Agency-specific details are replaced with slots and drafting notes are added; they are not endorsed by the department.
