@@ -56,12 +56,16 @@ function body(md: string, title?: string): string {
       case "table": {
         const all = [...(b.head ? [b.head] : []), ...b.rows];
         const cols = Math.max(...all.map((r) => r.length));
-        const w = Math.floor(9000 / cols);
+        // Column widths follow the content, so a column of short answers stays narrow and the text columns get the room.
+        const weights = Array.from({ length: cols }, (_, c) => Math.max(4, ...all.map((r) => Math.min(48, (r[c] ?? "").length))));
+        const total = weights.reduce((s, x) => s + x, 0);
+        const widths = weights.map((x) => Math.max(560, Math.floor((9000 * x) / total)));
+        const shade = '<w:shd w:val="clear" w:color="auto" w:fill="E3EEF6"/>';
         const border = '<w:top w:val="single" w:sz="4" w:color="BFBFBF"/><w:left w:val="single" w:sz="4" w:color="BFBFBF"/><w:bottom w:val="single" w:sz="4" w:color="BFBFBF"/><w:right w:val="single" w:sz="4" w:color="BFBFBF"/><w:insideH w:val="single" w:sz="4" w:color="BFBFBF"/><w:insideV w:val="single" w:sz="4" w:color="BFBFBF"/>';
         const row = (r: string[], head: boolean) =>
-          `<w:tr>${Array.from({ length: cols }, (_, c) => `<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/></w:tcPr>${para(runs(r[c] ?? "", { bold: head }))}</w:tc>`).join("")}</w:tr>`;
+          `<w:tr>${Array.from({ length: cols }, (_, c) => `<w:tc><w:tcPr><w:tcW w:w="${widths[c]}" w:type="dxa"/>${head ? shade : ""}</w:tcPr>${para(runs(r[c] ?? "", { bold: head }), '<w:spacing w:before="40" w:after="40"/>')}</w:tc>`).join("")}</w:tr>`;
         out.push(
-          `<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblBorders>${border}</w:tblBorders><w:tblCellMar><w:left w:w="80" w:type="dxa"/><w:right w:w="80" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>${`<w:gridCol w:w="${w}"/>`.repeat(cols)}</w:tblGrid>${b.head ? row(b.head, true) : ""}${b.rows.map((r) => row(r, false)).join("")}</w:tbl>`,
+          `<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblBorders>${border}</w:tblBorders><w:tblCellMar><w:left w:w="80" w:type="dxa"/><w:right w:w="80" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>${widths.map((w) => `<w:gridCol w:w="${w}"/>`).join("")}</w:tblGrid>${b.head ? row(b.head, true) : ""}${b.rows.map((r) => row(r, false)).join("")}</w:tbl>`,
           para(""),
         );
         break;

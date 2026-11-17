@@ -8,7 +8,7 @@ import { z } from "zod";
 import passages from "../data/content/passages.json";
 import { must } from "../src/guards.ts";
 import { normaliseRef } from "../src/corpus.ts";
-import { MATRIX_BASIS, MATRIX_CAUTION, MATRIX_NEXT, MATRIX_TESTS, type MatrixRow, assessRow, matrixMarkdown, summarise } from "../src/domain/evidence-matrix.ts";
+import { MATRIX_BASIS, MATRIX_CAUTION, MATRIX_NEXT, MATRIX_TESTS, type MatrixRow, assessRow, lean, matrixMarkdown, summarise } from "../src/domain/evidence-matrix.ts";
 import { EXEMPTIONS } from "../src/domain/exemptions.ts";
 import { GUIDELINES_AGAINST, WEIGHING_STEPS } from "../src/domain/public-interest.ts";
 import { estimateCharges } from "../src/domain/charges.ts";
@@ -107,6 +107,11 @@ describe("s 47C evidence matrix", () => {
     for (const change of [{ matter: "no" }, { process: "no" }, { factual: "yes" }, { operational: "yes" }, { excluded: "yes" }]) expect(assessRow(row({ ...all, ...change })).status, JSON.stringify(change)).toBe("away");
   });
 
+  it("colours each answer by which way it points, not by yes or no", () => {
+    expect([lean("matter", "yes"), lean("process", "no"), lean("factual", "yes"), lean("factual", "no"), lean("operational", "yes"), lean("excluded", "no")]).toEqual(["towards", "away", "away", "towards", "away", "towards"]);
+    expect([lean("matter", "part"), lean("factual", "intertwined"), lean("process", "unsure"), lean("matter", undefined)]).toEqual(["part", "towards", "open", "open"]);
+  });
+
   it("stays open while a test is unanswered or unsure, unless an answer already points away", () => {
     expect(assessRow(row({})).status).toBe("open");
     expect(assessRow(row({ ...all, process: "unsure" })).status).toBe("open");
@@ -126,7 +131,9 @@ describe("s 47C evidence matrix", () => {
     expect(s.counts).toEqual({ towards: 1, part: 1, away: 1, open: 1 });
     expect(s.text).toMatch(/s 11A\(5\)/);
     expect(summarise([row({ matter: "no" })]).text).toMatch(/does not fit/);
-    expect(matrixMarkdown([{ document: "Doc | 1", answers: all, evidence: "line\nbreak" }])).toContain("| Doc / 1 | Yes | Yes | No | No | No | line break |");
+    const md = matrixMarkdown([{ document: "Doc | 1", answers: { ...all, factual: "intertwined" }, evidence: "line\nbreak" }]);
+    expect(md).toContain("| Doc / 1 | Yes | Yes | Mixed | No | No | Towards s 47C |");
+    expect(md).toContain("- Evidence: line break");
   });
 });
 

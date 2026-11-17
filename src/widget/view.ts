@@ -13,7 +13,21 @@
  */
 import { App, applyDocumentTheme, applyHostStyleVariables } from "@modelcontextprotocol/ext-apps";
 import { longDate } from "../domain/deadlines.ts";
-import { MATRIX_BASIS, MATRIX_CAUTION, MATRIX_NEXT, MATRIX_TESTS, type MatrixOutcome, type MatrixRow, assessRow, matrixMarkdown, summarise } from "../domain/evidence-matrix.ts";
+import {
+  MATRIX_BASIS,
+  MATRIX_CAUTION,
+  MATRIX_NEXT,
+  MATRIX_TESTS,
+  type MatrixOutcome,
+  type MatrixRow,
+  type MatrixStatus,
+  STATUS_SHORT,
+  assessRow,
+  lean,
+  matrixMarkdown,
+  shortAnswer,
+  summarise,
+} from "../domain/evidence-matrix.ts";
 import { factorList } from "../domain/public-interest.ts";
 import { isRecord } from "../guards.ts";
 import { type View, viewSchema } from "../mcp/view-schema.ts";
@@ -52,19 +66,18 @@ function caseStripHtml(v: View): string {
   const c = v.case;
   if (!c) return "";
   const due = c.decision_due
-    ? `<b>${esc(longDate(c.decision_due))}</b>${c.days_remaining !== null && c.days_remaining >= 0 ? ` · ${plural(c.days_remaining, "day")} left` : ""}`
-    : c.paused_since
-      ? `clock stopped since ${esc(longDate(c.paused_since))}`
-      : "—";
+    ? `<div class="v">${esc(longDate(c.decision_due))}</div>${c.days_remaining !== null && c.days_remaining >= 0 ? `<div class="small">${plural(c.days_remaining, "day")} left</div>` : ""}`
+    : `<div class="v">${c.paused_since ? `Clock stopped since ${esc(longDate(c.paused_since))}` : "—"}</div>`;
+  const cell = (k: string, v: string, cls = "") => `<div class="cell${cls}"><span class="k">${k}</span>${v}</div>`;
   return `<section class="case" aria-label="Case file">
-    <div class="case-row">
-      <span><span class="k">Request</span> ${esc(c.reference ?? "—")}</span>
-      <span><span class="k">Received</span> ${esc(longDate(c.received))}</span>
-      <span><span class="k">Decision due</span> ${due}</span>
-      <span><span class="k">Status</span> ${esc(c.status)}</span>
-      ${c.stage_title ? `<span><span class="k">Step</span> ${esc(c.stage_title)}</span>` : ""}
+    <div class="case-grid">
+      ${cell("Request", `<div class="v">${esc(c.reference ?? "—")}</div>`)}
+      ${cell("Received", `<div class="v">${esc(longDate(c.received))}</div>`)}
+      ${cell("Decision due", due, " due")}
+      ${cell("Status", `<div class="v">${esc(c.status)}</div>`)}
+      ${c.stage_title ? cell("Step", `<div class="v">${esc(c.stage_title)}</div>`) : ""}
     </div>
-    ${c.events.length ? `<details><summary>Events recorded (${c.events.length})</summary><ul>${c.events.map((e) => `<li>${esc(longDate(e.date))} — ${esc(e.label)}</li>`).join("")}</ul></details>` : `<div class="muted small">No events recorded yet.</div>`}
+    ${c.events.length ? `<details><summary>Events recorded (${c.events.length})</summary><ul>${c.events.map((e) => `<li>${esc(longDate(e.date))} — ${esc(e.label)}</li>`).join("")}</ul></details>` : `<div class="none muted small">No events recorded yet.</div>`}
   </section>`;
 }
 
@@ -220,41 +233,72 @@ function renderExemption(v: Extract<View, { kind: "exemption" }>): string {
   return shell(v, e.kind === "conditional" ? "Conditional exemption" : "Exemption", inner, exportButtons("guide"));
 }
 
-const outcomeHtml = (o: MatrixOutcome, links: Record<string, string>) => `<span class="mx-status ${o.status}">${esc(o.label)}</span><div class="small">${rich(o.reason, links)}</div>`;
+// --- evidence matrix: an at-a-glance grid over one card per document ------------------
+
+const outcomeHtml = (o: MatrixOutcome, links: Record<string, string>) => `<span class="pill ${o.status}">${esc(STATUS_SHORT[o.status])}</span><b>${esc(o.label)}</b><div class="why">${rich(o.reason, links)}</div>`;
+
+const TILE_LABELS: Record<MatrixStatus, string> = { towards: "point towards s 47C", part: "point to part only", away: "point away from it", open: "still to answer" };
+const STATUSES: MatrixStatus[] = ["towards", "part", "away", "open"];
+
+function tilesHtml(rows: MatrixRow[]): string {
+  const { counts } = summarise(rows);
+  return STATUSES.map((s) => `<div class="tile ${s}${counts[s] ? "" : " zero"}"><div class="tile-n">${counts[s]}</div><div class="tile-l">${esc(TILE_LABELS[s])}</div></div>`).join("");
+}
+
+/** The matrix itself: documents down, the five questions across, each answer coloured by which way it points. */
+function overviewHtml(rows: MatrixRow[]): string {
+  if (!rows.length) return "";
+  const body = rows
+    .map((r, n) => {
+      const cells = MATRIX_TESTS.map((t) => `<td class="q"><span class="lean ${lean(t.id, r.answers[t.id])}">${esc(shortAnswer(t, r.answers[t.id]))}</span></td>`).join("");
+      return `<tr data-goto-row="${n}" title="Go to this row"><td class="doc"><span class="i">${n + 1}</span>${esc(r.document) || `<span class="muted">Untitled</span>`}</td>${cells}<td><span class="pill ${assessRow(r).status}">${esc(STATUS_SHORT[assessRow(r).status])}</span></td></tr>`;
+    })
+    .join("");
+  return `<div class="table"><table class="ov">
+      <thead><tr><th>Document or passage</th>${MATRIX_TESTS.map((t, i) => `<th class="q" title="${esc(t.heading)}">Q${i + 1}</th>`).join("")}<th>Answers point</th></tr></thead>
+      <tbody>${body}</tbody>
+    </table></div>
+    <div class="legend">${MATRIX_TESTS.map((t, i) => `<span><b>Q${i + 1}</b> ${esc(t.heading.replace(/\?$/, ""))}</span>`).join("")}</div>`;
+}
+
+function matrixCardHtml(r: MatrixRow, n: number, links: Record<string, string>): string {
+  const o = assessRow(r);
+  const questions = MATRIX_TESTS.map(
+    (t, i) => `<div class="mx-q">
+        <button type="button" class="mx-qname" data-help="${t.id}" title="What counts? ${esc(t.question)}"><span class="qn">Q${i + 1}</span><span class="qt">${esc(t.heading)}</span><span class="prov">${esc(t.provision)}</span></button>
+        <div class="seg" role="radiogroup" aria-label="${esc(t.heading)}">${t.options
+          .map(
+            (opt) =>
+              `<label class="opt" data-lean="${lean(t.id, opt.value)}"><input type="radio" name="mx-${n}-${t.id}" data-mx-test="${t.id}" value="${esc(opt.value)}"${r.answers[t.id] === opt.value ? " checked" : ""}><span>${esc(opt.label)}</span></label>`,
+          )
+          .join("")}</div>
+      </div>`,
+  ).join("");
+  return `<section class="mx-card ${o.status}" data-matrix-row="${n}" aria-label="Document or passage ${n + 1}">
+      <div class="mx-head"><span class="mx-idx">${n + 1}</span><input type="text" class="mx-doc" data-mx-doc value="${esc(r.document)}" placeholder="Name the document or passage, e.g. Doc 3, p 2 paras 4–6" aria-label="Document or passage"><button type="button" class="x" data-remove-row="${n}" aria-label="Remove this row" title="Remove this row">✕</button></div>
+      ${questions}
+      <label class="mx-ev"><span class="k">Evidence: what shows this?</span><textarea data-mx-evidence rows="2" placeholder="A short note, not the document's content. For example: options paper prepared before the decision was made.">${esc(r.evidence)}</textarea></label>
+      <div class="mx-out" data-mx-outcome>${outcomeHtml(o, links)}</div>
+    </section>`;
+}
 
 function renderMatrix(v: Extract<View, { kind: "evidence_matrix" }>): string {
-  const rows = v.rows
-    .map(
-      (r, n) => `<tr data-matrix-row="${n}">
-        <td><input type="text" data-mx-doc value="${esc(r.document)}" placeholder="e.g. Doc 3, p 2 paras 4–6" aria-label="Document or passage"></td>
-        ${MATRIX_TESTS.map(
-          (t) =>
-            `<td><select data-mx-test="${t.id}" aria-label="${esc(t.heading)}"><option value="">—</option>${t.options
-              .map((o) => `<option value="${esc(o.value)}"${r.answers[t.id] === o.value ? " selected" : ""}>${esc(o.label)}</option>`)
-              .join("")}</select></td>`,
-        ).join("")}
-        <td><textarea data-mx-evidence rows="2" placeholder="What shows this?" aria-label="Evidence">${esc(r.evidence)}</textarea></td>
-        <td data-mx-outcome>${outcomeHtml(assessRow(r), v.links)}</td>
-        <td><button type="button" class="link" data-remove-row="${n}" aria-label="Remove row">✕</button></td>
-      </tr>`,
-    )
-    .join("");
   const inner = `
-    <div class="banner info"><b>Where the answers point</b><p data-mx-summary>${rich(summarise(v.rows).text, v.links)}</p></div>
-    <p class="small muted">Describe each document or passage with a label, not its content. Answer the five questions together, and note what shows it.</p>
-    <div class="table"><table class="matrix">
-      <thead><tr><th>Document or passage</th>${MATRIX_TESTS.map((t, i) => `<th title="${esc(t.question)}">${i + 1}. ${esc(t.heading)}<div class="small">${esc(t.provision)}</div></th>`).join("")}<th>Evidence</th><th>Where the answers point</th><th></th></tr></thead>
-      <tbody>${rows || `<tr><td colspan="${MATRIX_TESTS.length + 4}" class="muted">No rows yet. Add a document or passage.</td></tr>`}</tbody>
-    </table></div>
-    <div class="row"><button type="button" data-action="add-row">Add document or passage</button><button type="button" class="primary" data-action="walk-matrix">Walk me through this</button><button type="button" data-action="save-matrix">Update matrix</button><button type="button" data-open-pit="${esc(v.provision)}">Run the public interest test</button></div>
+    <div class="tiles" data-mx-tiles>${tilesHtml(v.rows)}</div>
+    <p class="small muted" data-mx-summary>${rich(summarise(v.rows).text, v.links)}</p>
+    <div data-mx-overview>${overviewHtml(v.rows)}</div>
+    <h2>${v.rows.length ? "Document by document" : "Start with a document or passage"}</h2>
+    <p class="small muted">Name each one with a label, not its content. Answer the five questions together and note what shows it. Select a question's name to see what counts.</p>
+    ${v.rows.map((r, n) => matrixCardHtml(r, n, v.links)).join("")}
+    <button type="button" class="mx-add" data-action="add-row">+ Add a document or passage</button>
+    <div class="row"><button type="button" class="primary" data-action="walk-matrix">Walk me through this</button><button type="button" data-action="save-matrix">Update the assistant</button><button type="button" data-open-pit="${esc(v.provision)}">Run the public interest test</button></div>
     <h2>The five questions</h2>
     <p class="small">${rich(MATRIX_CAUTION, v.links)}</p>
-    ${MATRIX_TESTS.map((t, i) =>
-      section(
-        `${i + 1}. ${t.heading} (${t.provision})`,
-        `<p>${esc(t.question)}</p><p class="small"><b>A “yes” looks like</b></p>${list(t.yes_looks_like, v.links)}<p class="small"><b>A “no” looks like</b></p>${list(t.no_looks_like, v.links)}`,
-        i === 0,
-      ),
+    ${MATRIX_TESTS.map(
+      (t, i) => `<details id="mxq-${t.id}"><summary><span class="qn">Q${i + 1}</span>${esc(t.heading)} <span class="prov">${esc(t.provision)}</span></summary>
+        <p>${esc(t.question)}</p>
+        <div class="yn"><div><span class="k">A “yes” looks like</span>${list(t.yes_looks_like, v.links)}</div><div><span class="k">A “no” looks like</span>${list(t.no_looks_like, v.links)}</div></div>
+      </details>`,
     ).join("")}
     ${section("What comes next", list(MATRIX_NEXT, v.links))}`;
   return shell(v, `Evidence matrix · s ${v.provision}`, inner, exportButtons("matrix"));
@@ -266,10 +310,12 @@ function renderProcess(v: Extract<View, { kind: "process" }>): string {
     .map((s) => {
       const ids = s.steps.map((st) => st.id);
       const state = ids.includes(v.current ?? "") ? "current" : ids.length && ids.every((id) => done.has(id)) ? "done" : "";
-      return `<li class="stage ${state}"><div class="stage-title">${esc(s.title)}</div><ul>${s.steps
+      const [, n, name] = /^(\d+)\.\s*(.*)$/.exec(s.title) ?? ["", "", s.title];
+      return `<li class="stage ${state}"><div class="stage-title">${n ? `<span class="n">${esc(n)}</span>` : ""}<span>${esc(name)}</span></div><ul>${s.steps
         .map((st) => {
           const cls = st.id === v.current ? "current" : done.has(st.id) ? "done" : "";
-          return `<li><button type="button" class="step ${cls}" data-open-step="${esc(st.id)}" title="${esc(st.purpose)}">${cls === "done" ? "✓ " : cls === "current" ? "● " : ""}${esc(st.title)}</button></li>`;
+          const state = cls === "done" ? " (done)" : cls === "current" ? " (current step)" : "";
+          return `<li><button type="button" class="step ${cls}" data-open-step="${esc(st.id)}" title="${esc(st.purpose)}" aria-label="${esc(st.title + state)}">${esc(st.title)}</button></li>`;
         })
         .join("")}</ul></li>`;
     })
@@ -459,12 +505,12 @@ function saveFactors(v: Extract<View, { kind: "public_interest" }>, edited: { fa
 /** Read the evidence matrix rows as edited. */
 function editedRows(): MatrixRow[] {
   const out: MatrixRow[] = [];
-  for (const tr of root.querySelectorAll("tr[data-matrix-row]")) {
+  for (const tr of root.querySelectorAll("section[data-matrix-row]")) {
     const doc = tr.querySelector("[data-mx-doc]");
     const evidence = tr.querySelector("[data-mx-evidence]");
     const answers: Record<string, string> = {};
-    for (const sel of tr.querySelectorAll("select[data-mx-test]")) {
-      if (sel instanceof HTMLSelectElement && sel.dataset.mxTest && sel.value) answers[sel.dataset.mxTest] = sel.value;
+    for (const radio of tr.querySelectorAll("input[data-mx-test]:checked")) {
+      if (radio instanceof HTMLInputElement && radio.dataset.mxTest) answers[radio.dataset.mxTest] = radio.value;
     }
     out.push({ document: doc instanceof HTMLInputElement ? doc.value.trim() : "", answers, evidence: evidence instanceof HTMLTextAreaElement ? evidence.value.trim() : "" });
   }
@@ -478,12 +524,21 @@ function keepMatrix(v: Extract<View, { kind: "evidence_matrix" }>, rows: MatrixR
     render();
     return;
   }
-  [...root.querySelectorAll("[data-mx-outcome]")].forEach((td, n) => {
+  [...root.querySelectorAll("section[data-matrix-row]")].forEach((card, n) => {
     const row = rows[n];
-    if (row) td.innerHTML = outcomeHtml(assessRow(row), v.links);
+    const out = card.querySelector("[data-mx-outcome]");
+    if (!row || !out) return;
+    const o = assessRow(row);
+    card.className = `mx-card ${o.status}`;
+    out.innerHTML = outcomeHtml(o, v.links);
   });
-  const summary = root.querySelector("[data-mx-summary]");
-  if (summary) summary.innerHTML = rich(summarise(rows).text, v.links);
+  const patch = (selector: string, html: string) => {
+    const el = root.querySelector(selector);
+    if (el) el.innerHTML = html;
+  };
+  patch("[data-mx-summary]", rich(summarise(rows).text, v.links));
+  patch("[data-mx-tiles]", tilesHtml(rows));
+  patch("[data-mx-overview]", overviewHtml(rows));
 }
 
 /** Tell the model what the matrix now says. */
@@ -502,9 +557,25 @@ root.addEventListener("click", (ev) => {
     void app.openLink({ url: link.dataset.url }).catch(() => say("Links can't open here"));
     return;
   }
+  const goto = target.closest("tr[data-goto-row]");
+  if (goto instanceof HTMLElement) {
+    const card = root.querySelector(`section[data-matrix-row="${goto.dataset.gotoRow}"]`);
+    card?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const name = card?.querySelector("[data-mx-doc]");
+    if (name instanceof HTMLInputElement) name.focus({ preventScroll: true });
+    return;
+  }
   const el = target.closest("button");
   if (!(el instanceof HTMLButtonElement)) return;
   const d = el.dataset;
+  if (d.help) {
+    const guide = document.getElementById(`mxq-${d.help}`);
+    if (guide instanceof HTMLDetailsElement) {
+      guide.open = true;
+      guide.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    return;
+  }
   if (d.action === "back") {
     history.pop();
     render();
@@ -564,7 +635,7 @@ root.addEventListener("click", (ev) => {
 root.addEventListener("change", (ev) => {
   const box = ev.target;
   const v = history.at(-1);
-  if (v?.kind === "evidence_matrix" && box instanceof Element && box.closest("tr[data-matrix-row]")) {
+  if (v?.kind === "evidence_matrix" && box instanceof Element && box.closest("section[data-matrix-row]")) {
     keepMatrix(v, editedRows(), false);
     return;
   }

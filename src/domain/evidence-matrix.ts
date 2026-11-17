@@ -15,7 +15,8 @@
 
 export type MatrixTestId = "matter" | "process" | "factual" | "operational" | "excluded";
 
-export type MatrixOption = { value: string; label: string };
+/** `short` is the label for a narrow cell (the at-a-glance grid, the exported table). */
+export type MatrixOption = { value: string; label: string; short?: string };
 
 export type MatrixTest = {
   id: MatrixTestId;
@@ -32,7 +33,7 @@ export type MatrixTest = {
 const YES_NO: MatrixOption[] = [
   { value: "yes", label: "Yes" },
   { value: "no", label: "No" },
-  { value: "unsure", label: "Not sure" },
+  { value: "unsure", label: "Not sure", short: "?" },
 ];
 
 export const MATRIX_TESTS: MatrixTest[] = [
@@ -53,9 +54,9 @@ export const MATRIX_TESTS: MatrixTest[] = [
     ],
     options: [
       { value: "yes", label: "Yes" },
-      { value: "part", label: "Some of it" },
+      { value: "part", label: "Some of it", short: "Part" },
       { value: "no", label: "No" },
-      { value: "unsure", label: "Not sure" },
+      { value: "unsure", label: "Not sure", short: "?" },
     ],
   },
   {
@@ -91,10 +92,10 @@ export const MATRIX_TESTS: MatrixTest[] = [
     ],
     options: [
       { value: "no", label: "No" },
-      { value: "part", label: "Some, and it can be separated" },
-      { value: "intertwined", label: "Some, but it can't be separated" },
-      { value: "yes", label: "Yes, all of it" },
-      { value: "unsure", label: "Not sure" },
+      { value: "part", label: "Some, separable", short: "Part" },
+      { value: "intertwined", label: "Some, inseparable", short: "Mixed" },
+      { value: "yes", label: "All of it", short: "All" },
+      { value: "unsure", label: "Not sure", short: "?" },
     ],
   },
   {
@@ -145,6 +146,23 @@ export const STATUS_LABELS: Record<MatrixStatus, string> = {
   open: "Not answered yet",
 };
 
+/** For a narrow cell or a pill. */
+export const STATUS_SHORT: Record<MatrixStatus, string> = {
+  towards: "Towards s 47C",
+  part: "Part only",
+  away: "Away from s 47C",
+  open: "Open",
+};
+
+/** Which way one answer points. For questions 3 to 5 a "yes" points away from s 47C. */
+export function lean(test: MatrixTestId, value: string | undefined): MatrixStatus {
+  if (!value || value === "unsure") return "open";
+  if (value === "part") return "part";
+  if (value === "intertwined") return "towards";
+  const yesIsTowards = test === "matter" || test === "process";
+  return (value === "yes") === yesIsTowards ? "towards" : "away";
+}
+
 const outcome = (status: MatrixStatus, reason: string): MatrixOutcome => ({ status, label: STATUS_LABELS[status], reason });
 const answered = (v: string | undefined) => v !== undefined && v !== "" && v !== "unsure";
 
@@ -159,7 +177,7 @@ export function assessRow(row: MatrixRow): MatrixOutcome {
   if (a.process === "no") return outcome("away", "Question 2 was answered 'no'. Opinion or advice must have been obtained, prepared or recorded in the course of, or for the purposes of, a deliberative process ([6.55]).");
   if (a.operational === "yes") return outcome("away", "Question 4 was answered 'yes'. Operational information is not deliberative matter (s 47C(2)(a)).");
   if (a.excluded === "yes") return outcome("away", "Question 5 was answered 'yes'. s 47C does not apply to expert scientific or technical reports, or to the record of or reasons for a final decision (s 47C(3)).");
-  if (a.factual === "yes") return outcome("away", "Question 3 was answered 'yes, all of it'. Purely factual material is not deliberative matter (s 47C(2)(b)).");
+  if (a.factual === "yes") return outcome("away", "Question 3 was answered 'all of it'. Purely factual material is not deliberative matter (s 47C(2)(b)).");
 
   const missing = MATRIX_TESTS.filter((t) => !answered(a[t.id]));
   if (missing.length) return outcome("open", `Still to answer: ${missing.map((t) => t.heading.replace(/\?$/, "")).join("; ")}.`);
@@ -215,18 +233,36 @@ export const MATRIX_NEXT = [
 ];
 
 const cell = (s: string) => s.replace(/\|/g, "/").replace(/\s+/g, " ").trim();
-const optionLabel = (t: MatrixTest, value: string | undefined) => t.options.find((o) => o.value === value)?.label ?? "—";
+/** The answer as it reads in a narrow cell: "Yes", "Part", "?", or a dash where unanswered. */
+export const shortAnswer = (t: MatrixTest, value: string | undefined): string => {
+  const o = t.options.find((x) => x.value === value);
+  return o ? (o.short ?? o.label) : "—";
+};
+const fullAnswer = (t: MatrixTest, value: string | undefined) => t.options.find((o) => o.value === value)?.label ?? "not answered";
 
-/** The whole matrix as markdown: the table, the read-out, the tests explained, and what comes next. */
+/**
+ * The whole matrix as markdown, shaped to export well: a narrow grid (short answers
+ * under numbered questions), then each row written out with its answers, evidence and
+ * where they point, then the questions explained and what comes next.
+ */
 export function matrixMarkdown(rows: MatrixRow[]): string {
   const lines = ["## Evidence matrix — s 47C (deliberative processes)", "", summarise(rows).text, "", `_${MATRIX_BASIS}_`, ""];
-  lines.push(`| Document or passage | ${MATRIX_TESTS.map((t) => t.heading).join(" | ")} | Evidence | Where the answers point |`);
-  lines.push(`|${"---|".repeat(MATRIX_TESTS.length + 3)}`);
-  for (const r of rows) {
+  lines.push(`| Document or passage | ${MATRIX_TESTS.map((_, i) => `Q${i + 1}`).join(" | ")} | Answers point |`);
+  lines.push(`|${"---|".repeat(MATRIX_TESTS.length + 2)}`);
+  for (const r of rows) lines.push(`| ${cell(r.document) || "—"} | ${MATRIX_TESTS.map((t) => shortAnswer(t, r.answers[t.id])).join(" | ")} | ${STATUS_SHORT[assessRow(r).status]} |`);
+  if (!rows.length) lines.push(`| _add a document or passage_ | ${MATRIX_TESTS.map(() => "—").join(" | ")} | — |`);
+  lines.push("", `_${MATRIX_TESTS.map((t, i) => `Q${i + 1} ${t.heading}`).join(" · ")}_`);
+  if (rows.length) lines.push("", "### Row by row");
+  rows.forEach((r, n) => {
     const o = assessRow(r);
-    lines.push(`| ${cell(r.document) || "—"} | ${MATRIX_TESTS.map((t) => optionLabel(t, r.answers[t.id])).join(" | ")} | ${cell(r.evidence) || "—"} | **${o.label}.** ${o.reason} |`);
-  }
-  if (!rows.length) lines.push(`| _add a document or passage_ | ${MATRIX_TESTS.map(() => "—").join(" | ")} | — | — |`);
+    lines.push(
+      "",
+      `**${n + 1}. ${cell(r.document) || "Untitled"}**`,
+      `- Where the answers point: **${o.label}.** ${o.reason}`,
+      `- Answers: ${MATRIX_TESTS.map((t, i) => `Q${i + 1} ${fullAnswer(t, r.answers[t.id]).toLowerCase()}`).join("; ")}.`,
+      `- Evidence: ${cell(r.evidence) || "none recorded"}`,
+    );
+  });
   lines.push("", "### The five questions", MATRIX_CAUTION, "");
   MATRIX_TESTS.forEach((t, i) => {
     lines.push(`**${i + 1}. ${t.heading}** (${t.provision}) ${t.question}`);
